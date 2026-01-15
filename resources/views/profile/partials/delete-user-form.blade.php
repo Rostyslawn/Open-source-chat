@@ -48,7 +48,7 @@
                                 @if($userItem->banned)
                                     <span
                                         class="ml-2 px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-                                        Ban
+                                        Banned
                                     </span>
                                 @endif
                             </p>
@@ -58,14 +58,24 @@
                         </div>
                     </div>
 
-                    @if($userItem->id !== Auth::id())
-                        <button
-                            onclick="confirmDeleteUser({{ $userItem->id }}, '{{ $userItem->name }}')"
-                            type="button"
-                            class="ml-4 inline-flex items-center px-4 py-2 bg-red-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-red-500 active:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150"
-                        >
-                            Ban
-                        </button>
+                    @if($userItem->id != Auth::id())
+                        @if($userItem->banned)
+                            <button
+                                onclick="confirmAction({{ $userItem->id }}, '{{ $userItem->name }}', 'unban')"
+                                type="button"
+                                class="ml-4 inline-flex items-center px-4 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-500 active:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150"
+                            >
+                                Unban
+                            </button>
+                        @else
+                            <button
+                                onclick="confirmAction({{ $userItem->id }}, '{{ $userItem->name }}', 'ban')"
+                                type="button"
+                                class="ml-4 inline-flex items-center px-4 py-2 bg-red-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-red-500 active:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150"
+                            >
+                                Ban
+                            </button>
+                        @endif
                     @endif
                 </div>
             @endforeach
@@ -76,14 +86,17 @@
         @endif
     </div>
 
-    <div id="deleteModal"
+    {{-- Ban Modal --}}
+    <div id="actionModal"
          class="hidden fixed inset-0 bg-gray-500 dark:bg-gray-900 bg-opacity-75 dark:bg-opacity-75 overflow-y-auto h-full w-full z-50 px-4">
         <div
             class="relative top-20 mx-auto p-5 border border-gray-200 dark:border-gray-700 w-full max-w-md shadow-lg rounded-lg bg-white dark:bg-gray-800">
-            <form id="deleteUserForm" method="POST" action="{{ route('profile.destroy') }}">
+
+            {{-- Ban Form --}}
+            <form id="banForm" method="POST" action="{{ route('profile.destroy') }}" style="display: none;">
                 @csrf
-                @method('DELETE')
-                <input type="hidden" name="user_id" id="deleteUserId">
+                @method('POST')
+                <input type="hidden" name="user_id" id="banUserId">
 
                 <div class="mt-3">
                     <div
@@ -99,17 +112,17 @@
                     </h3>
                     <div class="mt-2 px-7 py-3">
                         <p class="text-sm text-gray-600 dark:text-gray-400 text-center">
-                            You are about to ban user <span id="deleteUsername"
+                            You are about to ban user <span id="banUsername"
                                                             class="font-semibold text-gray-900 dark:text-gray-100"></span>.
                         </p>
                         <p class="text-sm text-gray-600 dark:text-gray-400 mt-2 text-center">
-                            This action cannot be undone!
+                            This action can be reversed later.
                         </p>
                     </div>
                     <div class="flex gap-3 px-4 py-3 mt-4">
                         <button
                             type="button"
-                            onclick="closeDeleteModal()"
+                            onclick="closeActionModal()"
                             class="flex-1 inline-flex justify-center items-center px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-widest shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-25 transition ease-in-out duration-150"
                         >
                             Cancel
@@ -123,16 +136,69 @@
                     </div>
                 </div>
             </form>
+
+            {{-- Unban Form --}}
+            <form id="unbanForm" method="POST" action="{{ route('profile.unban') }}" style="display: none;">
+                @csrf
+                <input type="hidden" name="user_id" id="unbanUserId">
+
+                <div class="mt-3">
+                    <div
+                        class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 dark:bg-green-900">
+                        <svg class="h-6 w-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor"
+                             viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mt-4 text-center">
+                        Unban this user?
+                    </h3>
+                    <div class="mt-2 px-7 py-3">
+                        <p class="text-sm text-gray-600 dark:text-gray-400 text-center">
+                            You are about to unban user <span id="unbanUsername"
+                                                              class="font-semibold text-gray-900 dark:text-gray-100"></span>.
+                        </p>
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mt-2 text-center">
+                            They will regain access to the system.
+                        </p>
+                    </div>
+                    <div class="flex gap-3 px-4 py-3 mt-4">
+                        <button
+                            type="button"
+                            onclick="closeActionModal()"
+                            class="flex-1 inline-flex justify-center items-center px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-widest shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-25 transition ease-in-out duration-150"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            class="flex-1 inline-flex justify-center items-center px-4 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-500 active:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150"
+                        >
+                            Unban Account
+                        </button>
+                    </div>
+                </div>
+            </form>
         </div>
     </div>
 
-    @if(session('status') == 'user-deleted')
+    {{-- Success Messages --}}
+    @if(session('status') == 'user-banned')
         <div
-            class="mt-4 p-4 bg-green-50 dark:bg-green-900/50 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200 rounded-lg">
+            class="mt-4 p-4 bg-red-50 dark:bg-red-900/50 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 rounded-lg">
             User successfully banned
         </div>
     @endif
 
+    @if(session('status') == 'user-unbanned')
+        <div
+            class="mt-4 p-4 bg-green-50 dark:bg-green-900/50 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200 rounded-lg">
+            User successfully unbanned
+        </div>
+    @endif
+
+    {{-- Error Messages --}}
     @if(session('error'))
         <div
             class="mt-4 p-4 bg-red-50 dark:bg-red-900/50 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 rounded-lg">
@@ -152,25 +218,35 @@
         });
     });
 
-    const confirmDeleteUser = (userId, username) => {
-        document.getElementById('deleteUsername').textContent = username;
-        document.getElementById('deleteUserId').value = userId;
-        document.getElementById('deleteModal').classList.remove('hidden');
+    const confirmAction = (userId, username, action) => {
+        if (action == 'ban') {
+            document.getElementById('banUsername').textContent = username;
+            document.getElementById('banUserId').value = userId;
+            document.getElementById('banForm').style.display = 'block';
+            document.getElementById('unbanForm').style.display = 'none';
+        } else if (action == 'unban') {
+            document.getElementById('unbanUsername').textContent = username;
+            document.getElementById('unbanUserId').value = userId;
+            document.getElementById('banForm').style.display = 'none';
+            document.getElementById('unbanForm').style.display = 'block';
+        }
+
+        document.getElementById('actionModal').classList.remove('hidden');
     };
 
-    const closeDeleteModal = () => {
-        document.getElementById('deleteModal').classList.add('hidden');
+    const closeActionModal = () => {
+        document.getElementById('actionModal').classList.add('hidden');
     };
 
-    document.getElementById('deleteModal').addEventListener('click', (e) => {
+    document.getElementById('actionModal').addEventListener('click', (e) => {
         if (e.target == e.currentTarget) {
-            closeDeleteModal();
+            closeActionModal();
         }
     });
 
     document.addEventListener('keydown', (e) => {
         if (e.key == 'Escape') {
-            closeDeleteModal();
+            closeActionModal();
         }
     });
 </script>

@@ -52,7 +52,7 @@ class ProfileController extends Controller
     }
 
     /**
-     * Delete the user's account.
+     * Ban the user's account.
      */
     public function destroy(Request $request): RedirectResponse
     {
@@ -82,7 +82,37 @@ class ProfileController extends Controller
             'banned' => true,
         ]);
 
-        return Redirect::route('profile.edit')->with('status', 'user-deleted');
+        return Redirect::route('profile.edit')->with('status', 'user-banned');
+    }
+
+    /**
+     * Unban the user's account.
+     */
+    public function unban(Request $request): RedirectResponse
+    {
+        if (!Auth::user()->admin) {
+            abort(403);
+        }
+
+        $request->validate([
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+        ]);
+
+        $user = User::findOrFail($request->user_id);
+
+        if (!$user->banned) {
+            return Redirect::route('profile.edit')->with('error', "User is not banned.");
+        }
+
+        if ($user->id == Auth::id()) {
+            return Redirect::route('profile.edit')->with('error', "You can't unban your own account.");
+        }
+
+        $user->update([
+            'banned' => false,
+        ]);
+
+        return Redirect::route('profile.edit')->with('status', 'user-unbanned');
     }
 
     public function generatekey(): RedirectResponse

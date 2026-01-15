@@ -16,8 +16,13 @@ Route::middleware(['auth', VerificationKey::class, BanCheck::class])->group(func
     Route::get('/profile', [ProfileController::class, 'edit'])->name('dashboard');
     Route::get('/profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile/update', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile/destroy', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::post('/profile/destroy', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::post('unban', [ProfileController::class, 'unban'])->name('profile.unban');
     Route::post('/profile/generatenewkey', [ProfileController::class, 'generatekey'])->name('profile.generatenewkey');
 });
+
+Route::get('/forbidden', function () {
+    return view('forbidden');
+})->name('forbidden');
 
 require __DIR__ . '/auth.php';
