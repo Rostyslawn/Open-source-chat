@@ -35,7 +35,6 @@ Before you begin, ensure you have the following installed on your system:
 ## 🚀 Quick Start
 
 ### 1. Clone the Repository
-
 ```bash
 git clone https://github.com/Rostyslawn/opensourcechat.git
 cd openchat
@@ -44,13 +43,11 @@ cd openchat
 ### 2. Configure Environment
 
 Copy the example environment file and configure it:
-
 ```bash
 cp .env.example .env
 ```
 
 Edit `.env` file and configure your database:
-
 ```env
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
@@ -63,7 +60,6 @@ DB_PASSWORD=your_password
 ### 3. Create Database
 
 Create a MySQL database named `openchat`:
-
 ```sql
 CREATE DATABASE openchat CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
@@ -71,7 +67,6 @@ CREATE DATABASE openchat CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ### 4. Install and Setup
 
 Run the complete installation and setup:
-
 ```bash
 npm run start-project
 ```
@@ -80,13 +75,13 @@ This command will:
 - Install PHP dependencies via Composer
 - Install Node.js dependencies via npm
 - Install and configure Laravel Reverb
+- Create storage symbolic link
 - Generate application key
 - Run database migrations and seeders
 
 ### 5. Start the Application
 
 Start all services (Laravel server, Reverb WebSocket server, and Vite dev server):
-
 ```bash
 npm run start
 ```
@@ -119,7 +114,6 @@ OpenChat uses a unique invitation key system for user registration:
 ## 📦 Available Scripts
 
 ### Development
-
 ```bash
 # Start all services in development mode
 npm run start
@@ -135,7 +129,6 @@ npm run dev
 ```
 
 ### Installation
-
 ```bash
 # Install backend dependencies
 npm run install:backend
@@ -146,6 +139,9 @@ npm run install:frontend
 # Install Laravel Reverb
 npm run reverb:install
 
+# Create storage symbolic link
+npm run storage:link
+
 # Setup Laravel (generate key, migrate database)
 npm run laravel:setup
 
@@ -154,7 +150,6 @@ npm run start-project
 ```
 
 ### Production
-
 ```bash
 # Build for production and start servers
 npm run prod
@@ -168,36 +163,36 @@ npm run build
 If you prefer to install step by step:
 
 ### 1. Install Backend Dependencies
-
 ```bash
 composer install
 ```
 
 ### 2. Install Frontend Dependencies
-
 ```bash
 npm install
 ```
 
 ### 3. Generate Application Key
-
 ```bash
 php artisan key:generate
 ```
 
 ### 4. Install Laravel Reverb
-
 ```bash
 php artisan reverb:install
 ```
 
-### 5. Run Database Migrations
+### 5. Create Storage Symbolic Link
+```bash
+php artisan storage:link
+```
 
+### 6. Run Database Migrations
 ```bash
 php artisan migrate:fresh --seed
 ```
 
-### 6. Start Services
+### 7. Start Services
 
 Open three terminal windows and run:
 
@@ -221,7 +216,6 @@ npm run dev
 ### Error: "Failed to create broadcaster for connection reverb"
 
 Make sure your `.env` file contains Reverb configuration:
-
 ```env
 BROADCAST_CONNECTION=reverb
 REVERB_APP_ID=your-app-id
@@ -233,7 +227,6 @@ REVERB_SCHEME=http
 ```
 
 Then clear config cache:
-
 ```bash
 php artisan config:clear
 ```
@@ -242,7 +235,6 @@ php artisan config:clear
 
 1. Check if `APP_KEY` is generated in `.env`
 2. Ensure storage and cache directories are writable:
-
 ```bash
 # Windows (PowerShell)
 icacls storage /grant "Users:(OI)(CI)F" /T
@@ -253,7 +245,6 @@ chmod -R 775 storage bootstrap/cache
 ```
 
 3. Clear all caches:
-
 ```bash
 php artisan config:clear
 php artisan cache:clear
@@ -261,16 +252,40 @@ php artisan route:clear
 php artisan view:clear
 ```
 
+### Error: "The storage link does not exist" or "403 Forbidden" when accessing files
+
+This error occurs when the symbolic link between `public/storage` and `storage/app/public` is missing. Files uploaded to storage cannot be accessed publicly without this link.
+
+**Solution:**
+
+Create the storage symbolic link:
+```bash
+npm run storage:link
+```
+
+Or manually:
+```bash
+php artisan storage:link
+```
+
+**For Windows users:** If the command fails, run Command Prompt as Administrator and execute:
+```cmd
+cd path\to\your\project
+mklink /D public\storage ..\storage\app\public
+```
+
+After creating the link, verify it exists:
+- Check that `public/storage` directory/link exists
+- Uploaded files should now be accessible at `http://localhost:8000/storage/uploads/...`
+
 ### Database Connection Issues
 
 Verify your database credentials in `.env` and ensure MySQL is running:
-
 ```bash
 php artisan migrate:status
 ```
 
 ## 📁 Project Structure
-
 ```
 openchat/
 ├── app/                    # Application core files
@@ -278,12 +293,16 @@ openchat/
 ├── config/                 # Configuration files
 ├── database/               # Migrations, seeders, factories
 ├── public/                 # Public assets
+│   └── storage/           # Symbolic link to storage/app/public
 ├── resources/              # Views, CSS, JS
 │   ├── css/               # Stylesheets
 │   ├── js/                # JavaScript files
 │   └── views/             # Blade templates
 ├── routes/                 # Route definitions
 ├── storage/                # Logs, cache, uploads
+│   └── app/
+│       └── public/        # Publicly accessible files
+│           └── uploads/   # User uploaded files
 ├── tests/                  # Test files
 ├── vendor/                 # Composer dependencies
 ├── .env                    # Environment configuration
@@ -370,7 +389,6 @@ Open source chat — это real-time мессенджер с открытым �
 ## 🚀 Быстрый старт
 
 ### 1. Клонируйте репозиторий
-
 ```bash
 git clone https://github.com/Rostyslawn/opensourcechat.git
 cd openchat
@@ -379,13 +397,11 @@ cd openchat
 ### 2. Настройте окружение
 
 Скопируйте файл примера окружения и настройте его:
-
 ```bash
 cp .env.example .env
 ```
 
 Отредактируйте файл `.env` и настройте базу данных:
-
 ```env
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
@@ -398,7 +414,6 @@ DB_PASSWORD=ваш_пароль
 ### 3. Создайте базу данных
 
 Создайте MySQL базу данных с именем `openchat`:
-
 ```sql
 CREATE DATABASE openchat CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
@@ -406,7 +421,6 @@ CREATE DATABASE openchat CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ### 4. Установка и настройка
 
 Запустите полную установку и настройку одной командой:
-
 ```bash
 npm run start-project
 ```
@@ -415,13 +429,13 @@ npm run start-project
 - Установку PHP зависимостей через Composer
 - Установку Node.js зависимостей через npm
 - Установку и настройку Laravel Reverb
+- Создание символической ссылки для storage
 - Генерацию ключа приложения
 - Запуск миграций базы данных и сидеров
 
 ### 5. Запуск приложения
 
 Запустите все сервисы (Laravel сервер, Reverb WebSocket сервер и Vite dev сервер):
-
 ```bash
 npm run start
 ```
@@ -454,7 +468,6 @@ OpenChat использует систему уникальных ключей �
 ## 📦 Доступные команды
 
 ### Разработка
-
 ```bash
 # Запустить все сервисы в режиме разработки
 npm run start
@@ -470,7 +483,6 @@ npm run dev
 ```
 
 ### Установка
-
 ```bash
 # Установить backend зависимости
 npm run install:backend
@@ -481,6 +493,9 @@ npm run install:frontend
 # Установить Laravel Reverb
 npm run reverb:install
 
+# Создать символическую ссылку storage
+npm run storage:link
+
 # Настроить Laravel (сгенерировать ключ, мигрировать БД)
 npm run laravel:setup
 
@@ -489,7 +504,6 @@ npm run start-project
 ```
 
 ### Продакшн
-
 ```bash
 # Собрать для продакшна и запустить сервера
 npm run prod
@@ -503,36 +517,36 @@ npm run build
 Если вы предпочитаете установку по шагам:
 
 ### 1. Установите backend зависимости
-
 ```bash
 composer install
 ```
 
 ### 2. Установите frontend зависимости
-
 ```bash
 npm install
 ```
 
 ### 3. Сгенерируйте ключ приложения
-
 ```bash
 php artisan key:generate
 ```
 
 ### 4. Установите Laravel Reverb
-
 ```bash
 php artisan reverb:install
 ```
 
-### 5. Запустите миграции базы данных
+### 5. Создайте символическую ссылку storage
+```bash
+php artisan storage:link
+```
 
+### 6. Запустите миграции базы данных
 ```bash
 php artisan migrate:fresh --seed
 ```
 
-### 6. Запустите сервисы
+### 7. Запустите сервисы
 
 Откройте три терминала и выполните:
 
@@ -556,7 +570,6 @@ npm run dev
 ### Ошибка: "Failed to create broadcaster for connection reverb"
 
 Убедитесь, что ваш файл `.env` содержит конфигурацию Reverb:
-
 ```env
 BROADCAST_CONNECTION=reverb
 REVERB_APP_ID=your-app-id
@@ -568,7 +581,6 @@ REVERB_SCHEME=http
 ```
 
 Затем очистите кэш конфигурации:
-
 ```bash
 php artisan config:clear
 ```
@@ -577,7 +589,6 @@ php artisan config:clear
 
 1. Проверьте, что `APP_KEY` сгенерирован в `.env`
 2. Убедитесь, что директории storage и cache доступны для записи:
-
 ```bash
 # Windows (PowerShell)
 icacls storage /grant "Users:(OI)(CI)F" /T
@@ -588,7 +599,6 @@ chmod -R 775 storage bootstrap/cache
 ```
 
 3. Очистите все кэши:
-
 ```bash
 php artisan config:clear
 php artisan cache:clear
@@ -596,16 +606,40 @@ php artisan route:clear
 php artisan view:clear
 ```
 
+### Ошибка: "The storage link does not exist" или "403 Forbidden" при доступе к файлам
+
+Эта ошибка возникает, когда символическая ссылка между `public/storage` и `storage/app/public` отсутствует. Файлы, загруженные в storage, не могут быть доступны публично без этой ссылки.
+
+**Решение:**
+
+Создайте символическую ссылку storage:
+```bash
+npm run storage:link
+```
+
+Или вручную:
+```bash
+php artisan storage:link
+```
+
+**Для пользователей Windows:** Если команда не работает, запустите Командную строку от имени Администратора и выполните:
+```cmd
+cd путь\к\вашему\проекту
+mklink /D public\storage ..\storage\app\public
+```
+
+После создания ссылки проверьте, что она существует:
+- Проверьте, что директория/ссылка `public/storage` существует
+- Загруженные файлы теперь должны быть доступны по адресу `http://localhost:8000/storage/uploads/...`
+
 ### Проблемы с подключением к базе данных
 
 Проверьте учетные данные базы данных в `.env` и убедитесь, что MySQL запущен:
-
 ```bash
 php artisan migrate:status
 ```
 
 ## 📁 Структура проекта
-
 ```
 openchat/
 ├── app/                    # Основные файлы приложения
@@ -613,12 +647,16 @@ openchat/
 ├── config/                 # Конфигурационные файлы
 ├── database/               # Миграции, сидеры, фабрики
 ├── public/                 # Публичные ассеты
+│   └── storage/           # Символическая ссылка на storage/app/public
 ├── resources/              # Представления, CSS, JS
 │   ├── css/               # Стили
 │   ├── js/                # JavaScript файлы
 │   └── views/             # Blade шаблоны
 ├── routes/                 # Определения маршрутов
 ├── storage/                # Логи, кэш, загрузки
+│   └── app/
+│       └── public/        # Публично доступные файлы
+│           └── uploads/   # Загруженные пользователями файлы
 ├── tests/                  # Тесты
 ├── vendor/                 # Composer зависимости
 ├── .env                    # Конфигурация окружения

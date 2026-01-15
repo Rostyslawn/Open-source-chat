@@ -11,7 +11,7 @@
         "serve": "php artisan serve",
         "dev": "vite",
         "build": "vite build",
-        "start-project": "npm-run-all install:backend install:frontend reverb:install laravel:setup",
+        "start-project": "npm-run-all install:backend install:frontend reverb:install storage:link laravel:setup",
         "start": "npm-run-all --parallel serve reverb:start dev",
         "prod": "npm-run-all build serve reverb:start"
     },
