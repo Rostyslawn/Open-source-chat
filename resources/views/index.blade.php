@@ -17,7 +17,6 @@
     @endphp
 </head>
 <body class="dark" x-data="{ open: false, sidebarOpen: false }">
-<!-- Mobile Overlay -->
 <div x-show="sidebarOpen"
      x-transition:enter="transition ease-out duration-300"
      x-transition:enter-start="opacity-0"
@@ -29,9 +28,7 @@
      class="mobile-overlay"
      style="display: none;">
 </div>
-
 <div class="chat-container">
-    <!-- Sidebar -->
     <div class="server-info" :class="{ 'mobile-open': sidebarOpen }">
         <div class="server-header">
             <div class="server-header-content">
@@ -46,7 +43,6 @@
         <span class="users-online-header">Users online:</span>
         <div class="online-users"></div>
     </div>
-
     <div class="chat-area">
         <div class="chat-header">
             <div class="chat-header-left">
@@ -107,8 +103,6 @@
                 </div>
             </div>
         </div>
-
-        <!-- Mobile Dropdown Menu -->
         <div x-show="open"
              x-transition:enter="transition ease-out duration-200"
              x-transition:enter-start="opacity-0 transform scale-95"
@@ -244,8 +238,6 @@
                 </div>
             </div>
         </div>
-
-        <!-- Delete Confirmation Modal -->
         <div class="delete-confirmation-modal" id="deleteConfirmModal">
             <div class="delete-modal-content">
                 <div class="delete-modal-header">

@@ -12,7 +12,6 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\File;
 
 class IndexController extends Controller
 {
@@ -75,22 +74,49 @@ class IndexController extends Controller
                     return response()->json(['status' => false, 'error' => 'Uploaded file is not valid.'], 422);
                 }
 
-                $storedFilePath = 0;
+                $fileHash = hash_file('sha256', $file->getRealPath());
 
-                $fileName = $file->getClientOriginalName();
-                $filePath = 'uploads/files/' . $fileName;
+                $existingMessage = Message::where('file_hash', $fileHash)->first();
 
-                if (Storage::disk('public')->exists($filePath)) {
-                    $storedFilePath = Storage::url($filePath);
+                $storedFilePath = null;
+
+                if ($existingMessage && $existingMessage->file_path) {
+                    $storedFilePath = $existingMessage->file_path;
+
+                    Log::info('File already exists, reusing', [
+                        'hash' => $fileHash,
+                        'path' => $storedFilePath,
+                    ]);
                 } else {
-                    $path = $file->storeAs('uploads/files', $fileName, 'public');
-                    $storedFilePath = Storage::url($path);
+                    $originalName = $file->getClientOriginalName();
+                    $extension = $file->getClientOriginalExtension();
+
+                    $cleanName = preg_replace('/[^A-Za-z0-9_\-]/', '_', pathinfo($originalName, PATHINFO_FILENAME));
+
+                    $safeFileName = Str::random(12) . '_' . $cleanName . '.' . $extension;
+
+                    $counter = 1;
+                    while (Storage::disk('public')->exists('uploads/files/' . $safeFileName)) {
+                        $safeFileName = Str::random(12) . '_' . $cleanName . '_' . $counter . '.' . $extension;
+                        $counter++;
+                    }
+
+                    $path = $file->storeAs('uploads/files', $safeFileName, 'public');
+                    $storedFilePath = '/storage/' . $path;
+
+                    Log::info('New file uploaded', [
+                        'hash' => $fileHash,
+                        'original' => $originalName,
+                        'saved_as' => $safeFileName,
+                        'path' => $storedFilePath,
+                    ]);
                 }
 
                 $messageData['file_path'] = $storedFilePath;
                 $messageData['file_name'] = $file->getClientOriginalName();
                 $messageData['file_type'] = $file->getMimeType();
                 $messageData['file_size'] = $file->getSize();
+                $messageData['file_hash'] = $fileHash;
 
             } catch (\Exception $e) {
                 Log::error('File upload exception: ' . $e->getMessage());
@@ -125,32 +151,54 @@ class IndexController extends Controller
         $message_id = $request->input('message_id');
         $message_data = Message::find($message_id);
 
-        if ($message_data) {
-            if ($message_data->sender_id == Auth::user()->id) {
-                if ($message_data->file_path) {
-                    $otherMessagesWithFile = Message::where('file_path', $message_data->file_path)
-                        ->where('id', '!=', $message_id)
-                        ->exists();
+        if (!$message_data) {
+            return response()->json(['status' => false, 'error' => 'Message not found.'], 404);
+        }
 
-                    if (!$otherMessagesWithFile) {
-                        try {
-                            $relativePath = str_replace('/storage/', '', $message_data->file_path);
-                            if (Storage::disk('public')->exists($relativePath)) {
-                                Storage::disk('public')->delete($relativePath);
-                            }
-                        } catch (\Exception $e) {
-                            Log::error('File deletion failed: ' . $e->getMessage());
-                        }
+        if ($message_data->sender_id !== Auth::id()) {
+            Log::warning('Unauthorized delete attempt', [
+                'user_id' => Auth::id(),
+                'message_id' => $message_id,
+                'owner_id' => $message_data->sender_id,
+            ]);
+            return response()->json(['status' => false, 'error' => 'Unauthorized.'], 403);
+        }
+
+        if ($message_data->file_path && $message_data->file_hash) {
+            $otherMessagesWithFile = Message::where('file_hash', $message_data->file_hash)
+                ->where('id', '!=', $message_id)
+                ->exists();
+
+            if (!$otherMessagesWithFile) {
+                try {
+                    $relativePath = str_replace('/storage/', '', $message_data->file_path);
+
+                    if (strpos($relativePath, '..') !== false) {
+                        Log::error('Path traversal attempt in file deletion', [
+                            'path' => $relativePath,
+                            'user_id' => Auth::id(),
+                        ]);
+                    } elseif (Storage::disk('public')->exists($relativePath)) {
+                        Storage::disk('public')->delete($relativePath);
+                        Log::info('File deleted', [
+                            'path' => $relativePath,
+                            'hash' => $message_data->file_hash,
+                        ]);
                     }
+                } catch (\Exception $e) {
+                    Log::error('File deletion failed: ' . $e->getMessage());
                 }
-
-                $message_data->delete();
-                event(new deleteMessageEvent($message_id));
-
-                return response()->json(['status' => true]);
+            } else {
+                Log::info('File not deleted - used by other messages', [
+                    'path' => $message_data->file_path,
+                    'hash' => $message_data->file_hash,
+                ]);
             }
         }
 
-        return response()->json(['status' => false, 'error' => 'Message not found or unauthorized.'], 404);
+        $message_data->delete();
+        event(new deleteMessageEvent($message_id));
+
+        return response()->json(['status' => true]);
     }
 }

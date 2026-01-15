@@ -15,7 +15,8 @@ class Message extends Model
         'file_path',
         'file_name',
         'file_type',
-        'file_size'
+        'file_size',
+        'file_hash',
     ];
 
     protected $casts = [
