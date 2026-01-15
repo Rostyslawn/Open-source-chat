@@ -1,6 +1,7 @@
 const users_online = document.querySelector('.online-users');
 const textarea = document.querySelector('.message-input');
 let messages_container = document.querySelector(".messages");
+let messageToDelete = null;
 
 const formatLocalTime = (isoString) => {
     const date = new Date(isoString);
@@ -90,6 +91,18 @@ const sendMessage = (messageText, file) => {
         });
 };
 
+const showDeleteConfirmation = (message_id) => {
+    messageToDelete = message_id;
+    const modal = document.getElementById('deleteConfirmModal');
+    modal.classList.add('active');
+};
+
+const hideDeleteConfirmation = () => {
+    const modal = document.getElementById('deleteConfirmModal');
+    modal.classList.remove('active');
+    messageToDelete = null;
+};
+
 const deleteMessage = (message_id) => {
     if (!message_id) return;
     fetch('/deleteMessage', {
@@ -104,8 +117,12 @@ const deleteMessage = (message_id) => {
             if (!res.ok) throw new Error("Response wasn't ok.");
             return res.json();
         })
+        .then(() => {
+            hideDeleteConfirmation();
+        })
         .catch(err => {
             console.error('Error:', err);
+            hideDeleteConfirmation();
         });
 };
 
@@ -115,6 +132,41 @@ document.addEventListener('DOMContentLoaded', () => {
         const time = message.dataset.time;
         message.querySelector('.message-time').textContent = formatLocalTime(time);
     });
+
+    const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+    const deleteModal = document.getElementById('deleteConfirmModal');
+
+    if (cancelDeleteBtn) {
+        cancelDeleteBtn.addEventListener('click', hideDeleteConfirmation);
+    }
+
+    if (confirmDeleteBtn) {
+        confirmDeleteBtn.addEventListener('click', () => {
+            if (messageToDelete) {
+                deleteMessage(messageToDelete);
+            }
+        });
+    }
+
+    if (deleteModal) {
+        deleteModal.addEventListener('click', (e) => {
+            if (e.target == deleteModal) {
+                hideDeleteConfirmation();
+            }
+        });
+    }
+
+    document.querySelectorAll('.delete-message').forEach(btn => {
+        const messageElement = btn.closest('.message');
+        if (messageElement) {
+            const messageId = messageElement.className.match(/message-id-(\d+)/)?.[1];
+            if (messageId) {
+                btn.onclick = () => showDeleteConfirmation(parseInt(messageId));
+            }
+        }
+    });
+
     window.Echo.join('online')
         .here(users => {
             users.forEach(user => {
@@ -200,7 +252,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     delete_message_div.classList.add("delete-message");
                     delete_message_div.textContent = "delete";
                     delete_message_div.onclick = () => {
-                        deleteMessage(message.id);
+                        showDeleteConfirmation(message.id);
                     };
                 }
 

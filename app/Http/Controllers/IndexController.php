@@ -27,7 +27,8 @@ class IndexController extends Controller
         $executed = RateLimiter::attempt(
             'send-message:' . Auth::id(),
             10,
-            function() {},
+            function () {
+            },
             30
         );
 
@@ -45,7 +46,7 @@ class IndexController extends Controller
         $validationRules = [];
 
         if ($hasFile) {
-            $validationRules['file'] = 'required|file|max:512000|mimes:jpg,jpeg,png,gif,webp,mp4,webm,pdf,doc,docx,txt';
+            $validationRules['file'] = 'required|file|max:512000';
         }
 
         if ($hasMessage) {
@@ -74,26 +75,22 @@ class IndexController extends Controller
                     return response()->json(['status' => false, 'error' => 'Uploaded file is not valid.'], 422);
                 }
 
-                $extension = strtolower($file->extension());
-                $safeName = Str::uuid() . '.' . $extension;
-                $filePath = 'uploads/files/' . $safeName;
+                $storedFilePath = 0;
+
+                $fileName = $file->getClientOriginalName();
+                $filePath = 'uploads/files/' . $fileName;
 
                 if (Storage::disk('public')->exists($filePath)) {
                     $storedFilePath = Storage::url($filePath);
-                    $existingFile = Message::where('file_path', $storedFilePath)->first();
-                    $fileSize = $existingFile->file_size ?? $file->getSize();
-                    $mimeType = $existingFile->file_type ?? $file->getMimeType();
                 } else {
-                    $path = $file->storeAs('uploads/files', $safeName, 'public');
+                    $path = $file->storeAs('uploads/files', $fileName, 'public');
                     $storedFilePath = Storage::url($path);
-                    $fileSize = $file->getSize();
-                    $mimeType = $file->getMimeType();
                 }
 
                 $messageData['file_path'] = $storedFilePath;
                 $messageData['file_name'] = $file->getClientOriginalName();
-                $messageData['file_type'] = $mimeType;
-                $messageData['file_size'] = $fileSize;
+                $messageData['file_type'] = $file->getMimeType();
+                $messageData['file_size'] = $file->getSize();
 
             } catch (\Exception $e) {
                 Log::error('File upload exception: ' . $e->getMessage());

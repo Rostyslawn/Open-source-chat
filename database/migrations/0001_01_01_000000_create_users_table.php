@@ -20,6 +20,7 @@ return new class extends Migration
             $table->string('password');
             $table->boolean('verified')->default(false);
             $table->boolean('admin')->default(false);
+            $table->boolean('banned')->default(false);
             $table->rememberToken();
             $table->timestamps();
         });

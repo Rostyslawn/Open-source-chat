@@ -66,17 +66,21 @@ class ProfileController extends Controller
 
         $user = User::findOrFail($request->user_id);
 
+        if ($user->banned) {
+            return Redirect::route('profile.edit')->with('error', "User already banned.");
+        }
+
         if ($user->id == Auth::id()) {
-            return Redirect::route('profile.edit')->with('error', "You can't delete your own account.");
+            return Redirect::route('profile.edit')->with('error', "You can't ban your own account.");
         }
 
         if ($user->admin) {
-            return Redirect::route('profile.edit')->with('error', "You can't delete admin account.");
+            return Redirect::route('profile.edit')->with('error', "You can't ban admin account.");
         }
 
-        DB::table('sessions')->where('user_id', $user->id)->delete();
-
-        $user->delete();
+        $user->update([
+            'banned' => true,
+        ]);
 
         return Redirect::route('profile.edit')->with('status', 'user-deleted');
     }

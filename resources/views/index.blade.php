@@ -16,20 +16,49 @@
         use App\Models\User;
     @endphp
 </head>
-<body class="dark">
+<body class="dark" x-data="{ open: false, sidebarOpen: false }">
+<!-- Mobile Overlay -->
+<div x-show="sidebarOpen"
+     x-transition:enter="transition ease-out duration-300"
+     x-transition:enter-start="opacity-0"
+     x-transition:enter-end="opacity-100"
+     x-transition:leave="transition ease-in duration-200"
+     x-transition:leave-start="opacity-100"
+     x-transition:leave-end="opacity-0"
+     @click="sidebarOpen = false"
+     class="mobile-overlay"
+     style="display: none;">
+</div>
+
 <div class="chat-container">
-    <div class="server-info">
+    <!-- Sidebar -->
+    <div class="server-info" :class="{ 'mobile-open': sidebarOpen }">
         <div class="server-header">
-            <p>Welcome to the chat!</p>
+            <div class="server-header-content">
+                <p>Welcome to the chat!</p>
+                <button @click="sidebarOpen = false" class="close-sidebar-btn">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
         </div>
         <span class="users-online-header">Users online:</span>
         <div class="online-users"></div>
     </div>
+
     <div class="chat-area">
         <div class="chat-header">
-            <div class="chat-header-info">
-                <h3>Main chat</h3>
-                <p>Start messaging now</p>
+            <div class="chat-header-left">
+                <button @click="sidebarOpen = !sidebarOpen" class="mobile-menu-btn">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                    </svg>
+                </button>
+                <div class="chat-header-info">
+                    <h3>Main chat</h3>
+                    <p>Start messaging now</p>
+                </div>
             </div>
             <div class="chat-right">
                 <div class="hidden sm:flex sm:items-center sm:ms-6">
@@ -78,6 +107,30 @@
                 </div>
             </div>
         </div>
+
+        <!-- Mobile Dropdown Menu -->
+        <div x-show="open"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 transform scale-95"
+             x-transition:enter-end="opacity-100 transform scale-100"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100 transform scale-100"
+             x-transition:leave-end="opacity-0 transform scale-95"
+             class="sm:hidden mobile-dropdown"
+             style="display: none;">
+            <div class="mobile-dropdown-content">
+                <a href="{{ route('profile.edit') }}" class="mobile-dropdown-link">
+                    {{ __('Profile') }}
+                </a>
+                <form method="POST" action="{{ route('logout') }}">
+                    @csrf
+                    <button type="submit" class="mobile-dropdown-link">
+                        {{ __('Log Out') }}
+                    </button>
+                </form>
+            </div>
+        </div>
+
         <div class="messages">
             @foreach($messages_data as $message)
                 @if($message->sender_id == Auth::id())
@@ -188,6 +241,23 @@
                 <div class="preview-footer">
                     <button class="cancel-upload" id="cancelUploadBtn">Cancel</button>
                     <button class="send-file" id="sendFileBtn">Send File</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Delete Confirmation Modal -->
+        <div class="delete-confirmation-modal" id="deleteConfirmModal">
+            <div class="delete-modal-content">
+                <div class="delete-modal-header">
+                    <h3>Delete Message</h3>
+                </div>
+                <div class="delete-modal-body">
+                    <p>Are you sure you want to delete this message?</p>
+                    <p class="delete-warning">This action cannot be undone.</p>
+                </div>
+                <div class="delete-modal-footer">
+                    <button class="cancel-delete-btn" id="cancelDeleteBtn">Cancel</button>
+                    <button class="confirm-delete-btn" id="confirmDeleteBtn">Delete</button>
                 </div>
             </div>
         </div>
