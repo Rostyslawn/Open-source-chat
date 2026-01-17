@@ -37,6 +37,10 @@ class User extends Authenticatable
         'admin'
     ];
 
+    protected $guarded = [
+        'admin',
+    ];
+
     /**
      * Get the attributes that should be cast.
      *
