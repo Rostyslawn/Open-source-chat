@@ -19,7 +19,10 @@ class BanCheck
     {
         $user = Auth::user();
 
-        if (!$user || $user->banned)
+        if (!$user)
+            return back();
+
+        if ($user->banned)
             return Redirect::route('forbidden')->with('error', "Your account has been banned.");
 
         return $next($request);
