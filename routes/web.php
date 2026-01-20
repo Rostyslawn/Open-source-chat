@@ -5,6 +5,7 @@ use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Middleware\VerificationKey;
 use App\Http\Middleware\BanCheck;
+use App\Http\Controllers\VoiceController;
 
 Route::middleware(['auth', VerificationKey::class, BanCheck::class])->group(function () {
     Route::get('/', [IndexController::class, 'index'])
@@ -19,6 +20,12 @@ Route::middleware(['auth', VerificationKey::class, BanCheck::class])->group(func
     Route::post('/profile/destroy', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::post('unban', [ProfileController::class, 'unban'])->name('profile.unban');
     Route::post('/profile/generatenewkey', [ProfileController::class, 'generatekey'])->name('profile.generatenewkey');
+    Route::post('/voice/signal', [VoiceController::class, 'sendSignal'])
+        ->name('voice.signal');
+    Route::post('/voice/joined', [VoiceController::class, 'joined'])
+        ->name('voice.joined');
+    Route::post('/voice/left', [VoiceController::class, 'left'])
+        ->name('voice.left');
 });
 
 Route::get('/forbidden', function () {

@@ -27,7 +27,6 @@ body.dark {
     position: relative;
 }
 
-/* Mobile Overlay */
 .mobile-overlay {
     position: fixed;
     top: 0;
@@ -39,7 +38,6 @@ body.dark {
     backdrop-filter: blur(2px);
 }
 
-/* Sidebar */
 .server-info {
     width: 240px;
     background-color: #1f2937;
@@ -157,7 +155,6 @@ body.dark {
     white-space: nowrap;
 }
 
-/* Chat Area */
 .chat-area {
     flex: 1;
     display: flex;
@@ -227,7 +224,6 @@ body.dark {
     flex-shrink: 0;
 }
 
-/* Mobile Dropdown */
 .mobile-dropdown {
     background-color: #1f2937;
     border-bottom: 1px solid #374151;
@@ -256,7 +252,6 @@ body.dark {
     background-color: #374151;
 }
 
-/* Messages */
 .messages {
     flex: 1;
     padding: 20px;
@@ -430,7 +425,6 @@ body.dark {
     transform: scale(0.98);
 }
 
-/* Input Area */
 .input-area {
     padding: 16px 20px;
     background-color: #111827;
@@ -533,7 +527,6 @@ body.dark {
     transform: translateY(0);
 }
 
-/* File Upload */
 .file-selected-indicator {
     position: absolute;
     top: -8px;
@@ -579,7 +572,6 @@ body.dark {
     100% { transform: scale(1); }
 }
 
-/* File Preview Modal */
 .file-preview-modal {
     display: none;
     position: fixed;
@@ -779,7 +771,6 @@ body.dark {
     }
 }
 
-/* Scrollbar */
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -799,7 +790,6 @@ body.dark {
     background: #6b7280;
 }
 
-/* Tablet Styles */
 @media (max-width: 1024px) {
     .server-info {
         width: 200px;
@@ -814,7 +804,6 @@ body.dark {
     }
 }
 
-/* Mobile Styles */
 @media (max-width: 768px) {
     .server-info {
         position: fixed;
@@ -902,7 +891,6 @@ body.dark {
     }
 }
 
-/* Small Mobile Styles */
 @media (max-width: 480px) {
     .server-info {
         width: 240px;
@@ -968,7 +956,6 @@ body.dark {
     }
 }
 
-/* Landscape Mobile */
 @media (max-height: 500px) and (orientation: landscape) {
     .messages {
         padding: 8px;
@@ -984,7 +971,6 @@ body.dark {
     }
 }
 
-/* Delete Confirmation Modal */
 .delete-confirmation-modal {
     display: none;
     position: fixed;
@@ -1121,5 +1107,139 @@ body.dark {
     .cancel-delete-btn,
     .confirm-delete-btn {
         width: 100%;
+    }
+}
+
+.voice-controls {
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    z-index: 100;
+}
+
+.voice-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background-color: #374151;
+    color: #e5e7eb;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 150ms ease-in-out;
+    font-size: 0.875rem;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+
+    &:hover {
+        background-color: #4b5563;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+    }
+
+    &:active {
+        transform: translateY(0);
+    }
+
+    svg {
+        flex-shrink: 0;
+    }
+}
+
+.join-voice {
+    background-color: #10b981;
+
+    &:hover {
+        background-color: #059669;
+    }
+}
+
+.mute-btn {
+    width: 48px;
+    height: 48px;
+    padding: 0;
+
+    &.muted {
+        background-color: #ef4444;
+
+        &:hover {
+            background-color: #dc2626;
+        }
+    }
+}
+
+.leave-voice {
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    background-color: #ef4444;
+
+    &:hover {
+        background-color: #dc2626;
+    }
+}
+
+.voice-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background-color: #10b981;
+    color: white;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+
+    .pulse {
+        width: 8px;
+        height: 8px;
+        background-color: white;
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.5;
+        transform: scale(1.2);
+    }
+}
+
+@media (max-width: 768px) {
+    .voice-controls {
+        bottom: 70px;
+        right: 12px;
+        gap: 8px;
+    }
+
+    .voice-btn {
+        padding: 10px 12px;
+        font-size: 0.8125rem;
+
+        span {
+            display: none;
+        }
+    }
+
+    .join-voice {
+        width: 48px;
+        height: 48px;
+        padding: 0;
+    }
+
+    .voice-indicator {
+        padding: 6px 10px;
+        font-size: 0.7rem;
     }
 }

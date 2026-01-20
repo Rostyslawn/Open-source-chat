@@ -27,3 +27,13 @@ Broadcast::channel('online', function ($user) {
         'avatar' => $user->avatar,
     ];
 });
+
+Broadcast::channel('voice-channel', function ($user) {
+    if (!$user) return false;
+    if (!$user->verified) return false;
+
+    return [
+        'id' => $user->id,
+        'name' => $user->name,
+    ];
+});
