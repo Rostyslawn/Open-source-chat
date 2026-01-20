@@ -44,69 +44,28 @@
         <div class="online-users"></div>
         <div class="voice-channels">
             <div class="voice-channels-header">Voice Channels</div>
-            <div class="voice-channel" data-channel-id="1">
-                <div class="voice-channel-header">
-                    <div class="voice-channel-info">
-                        <div class="voice-channel-icon">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                 stroke-width="2">
-                                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                                <line x1="12" y1="19" x2="12" y2="23"/>
-                                <line x1="8" y1="23" x2="16" y2="23"/>
-                            </svg>
+            @for($channel_id = 1; $channel_id <= 3; $channel_id++)
+                <div class="voice-channel" data-channel-id="{{ $channel_id }}">
+                    <div class="voice-channel-header">
+                        <div class="voice-channel-info">
+                            <div class="voice-channel-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                     stroke-width="2">
+                                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                                    <line x1="12" y1="19" x2="12" y2="23"/>
+                                    <line x1="8" y1="23" x2="16" y2="23"/>
+                                </svg>
+                            </div>
+                            <span class="voice-channel-name">Voice #{{ $channel_id }}</span>
                         </div>
-                        <span class="voice-channel-name">General Voice</span>
+                        <button class="voice-channel-join">Join</button>
+                        <span class="voice-channel-count">0</span>
                     </div>
-                    <span class="voice-channel-count">0</span>
-                    <button class="voice-channel-join">Join</button>
+                    <div class="voice-channel-users"></div>
+                    <button class="voice-channel-leave">Leave Channel</button>
                 </div>
-                <div class="voice-channel-users">
-                </div>
-                <button class="voice-channel-leave">Leave Channel</button>
-            </div>
-            <div class="voice-channel" data-channel-id="2">
-                <div class="voice-channel-header">
-                    <div class="voice-channel-info">
-                        <div class="voice-channel-icon">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                 stroke-width="2">
-                                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                                <line x1="12" y1="19" x2="12" y2="23"/>
-                                <line x1="8" y1="23" x2="16" y2="23"/>
-                            </svg>
-                        </div>
-                        <span class="voice-channel-name">Gaming</span>
-                    </div>
-                    <span class="voice-channel-count">0</span>
-                    <button class="voice-channel-join">Join</button>
-                </div>
-                <div class="voice-channel-users">
-                </div>
-                <button class="voice-channel-leave">Leave Channel</button>
-            </div>
-            <div class="voice-channel" data-channel-id="3">
-                <div class="voice-channel-header">
-                    <div class="voice-channel-info">
-                        <div class="voice-channel-icon">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                 stroke-width="2">
-                                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                                <line x1="12" y1="19" x2="12" y2="23"/>
-                                <line x1="8" y1="23" x2="16" y2="23"/>
-                            </svg>
-                        </div>
-                        <span class="voice-channel-name">Chill Zone</span>
-                    </div>
-                    <span class="voice-channel-count">0</span>
-                    <button class="voice-channel-join">Join</button>
-                </div>
-                <div class="voice-channel-users">
-                </div>
-                <button class="voice-channel-leave">Leave Channel</button>
-            </div>
+            @endfor
         </div>
         <div class="voice-user" data-user-id="{{ Auth::user()->id }}">
             <div class="voice-user-avatar">
@@ -114,21 +73,15 @@
             </div>
             <span class="voice-user-name">{{ Auth::user()->name }}</span>
             <div class="voice-user-status">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                    <line x1="12" y1="19" x2="12" y2="23"/>
-                    <line x1="8" y1="23" x2="16" y2="23"/>
-                </svg>
-                <!--
-                <svg class="muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="1" y1="1" x2="23" y2="23"/>
-                    <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/>
-                    <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/>
-                    <line x1="12" y1="19" x2="12" y2="23"/>
-                    <line x1="8" y1="23" x2="16" y2="23"/>
-                </svg>
-                -->
+                <button style="display: none" title="Mute/Unmute" id="muteBtn"
+                        class="voice-btn mute-btn voice-user-status">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                        <line x1="12" y1="19" x2="12" y2="23"/>
+                        <line x1="8" y1="23" x2="16" y2="23"/>
+                    </svg>
+                </button>
             </div>
         </div>
     </div>
