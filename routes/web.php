@@ -20,12 +20,15 @@ Route::middleware(['auth', VerificationKey::class, BanCheck::class])->group(func
     Route::post('/profile/destroy', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::post('unban', [ProfileController::class, 'unban'])->name('profile.unban');
     Route::post('/profile/generatenewkey', [ProfileController::class, 'generatekey'])->name('profile.generatenewkey');
+
     Route::post('/voice/signal', [VoiceController::class, 'sendSignal'])
         ->name('voice.signal');
     Route::post('/voice/joined', [VoiceController::class, 'joined'])
         ->name('voice.joined');
     Route::post('/voice/left', [VoiceController::class, 'left'])
         ->name('voice.left');
+    Route::post('/voice/mute-status', [VoiceController::class, 'muteStatus'])
+        ->name('voice.mute-status');
 });
 
 Route::get('/forbidden', function () {

@@ -2,7 +2,6 @@
 
 namespace App\Events;
 
-use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PresenceChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
@@ -13,22 +12,26 @@ class VoiceJoinedEvent implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public $user_id;
-    public $user_name;
+    public $channelId;
+    public $userId;
+    public $userName;
+    public $userAvatar;
 
-    public function __construct($user_id, $user_name)
+    public function __construct($channelId, $userId, $userName, $userAvatar)
     {
-        $this->user_id = $user_id;
-        $this->user_name = $user_name;
+        $this->channelId = $channelId;
+        $this->userId = $userId;
+        $this->userName = $userName;
+        $this->userAvatar = $userAvatar;
     }
 
     public function broadcastOn()
     {
-        return new PresenceChannel('voice-channel');
+        return new PresenceChannel('voice-channel-' . $this->channelId);
     }
 
     public function broadcastAs()
     {
-        return 'voice-joined';
+        return 'voice-user-joined';
     }
 }

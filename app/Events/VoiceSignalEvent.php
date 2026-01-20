@@ -2,7 +2,6 @@
 
 namespace App\Events;
 
-use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PresenceChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
@@ -13,22 +12,24 @@ class VoiceSignalEvent implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public $user_id;
-    public $target_user_id;
+    public $channelId;
+    public $userId;
+    public $targetUserId;
     public $type;
     public $signal;
 
-    public function __construct($user_id, $target_user_id, $type, $signal)
+    public function __construct($channelId, $userId, $targetUserId, $type, $signal)
     {
-        $this->user_id = $user_id;
-        $this->target_user_id = $target_user_id;
+        $this->channelId = $channelId;
+        $this->userId = $userId;
+        $this->targetUserId = $targetUserId;
         $this->type = $type;
         $this->signal = $signal;
     }
 
     public function broadcastOn()
     {
-        return new PresenceChannel('voice-channel');
+        return new PresenceChannel('voice-channel-' . $this->channelId);
     }
 
     public function broadcastAs()
