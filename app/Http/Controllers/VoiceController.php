@@ -8,6 +8,8 @@ use App\Events\VoiceLeftEvent;
 use App\Events\VoiceMuteStatusEvent;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class VoiceController extends Controller
 {
@@ -37,6 +39,18 @@ class VoiceController extends Controller
             'channel_id' => 'required|string',
         ]);
 
+        $cacheKey = "voice_channel_{$request->channel_id}_users";
+        $users = Cache::get($cacheKey, []);
+
+        $userData = [
+            'id' => Auth::id(),
+            'name' => Auth::user()->name,
+            'avatar' => Auth::user()->avatar,
+        ];
+
+        $users[Auth::id()] = $userData;
+        Cache::forever($cacheKey, $users);
+
         event(new VoiceJoinedEvent(
             $request->input('channel_id'),
             Auth::id(),
@@ -44,7 +58,7 @@ class VoiceController extends Controller
             Auth::user()->avatar
         ));
 
-        return response()->json(['status' => true]);
+        return response()->json(['status' => true, 'cached_users' => count($users)]);
     }
 
     public function left(Request $request)
@@ -52,6 +66,11 @@ class VoiceController extends Controller
         $request->validate([
             'channel_id' => 'required|string',
         ]);
+
+        $cacheKey = "voice_channel_{$request->channel_id}_users";
+        $users = Cache::get($cacheKey, []);
+        unset($users[Auth::id()]);
+        Cache::forever($cacheKey, $users);
 
         event(new VoiceLeftEvent(
             $request->input('channel_id'),
@@ -76,5 +95,17 @@ class VoiceController extends Controller
         ));
 
         return response()->json(['status' => true]);
+    }
+
+    public function getActiveUsers(Request $request)
+    {
+        $request->validate([
+            'channel_id' => 'required|string',
+        ]);
+
+        $cacheKey = "voice_channel_{$request->channel_id}_users";
+        $activeUsers = Cache::get($cacheKey, []);
+
+        return response()->json(['users' => $activeUsers]);
     }
 }

@@ -1131,6 +1131,7 @@ body.dark {
     border-radius: 6px;
     overflow: hidden;
     transition: background-color 150ms ease-in-out;
+    //max-height: 300px;
 }
 
 .voice-channel:hover {
@@ -1216,13 +1217,10 @@ body.dark {
 }
 
 .voice-channel-users {
-    max-height: 0;
+    //max-height: 0;
     overflow: hidden;
     transition: max-height 300ms ease-in-out;
-}
-
-.voice-channel.active .voice-channel-users {
-    max-height: 300px;
+    max-width: 300px;
 }
 
 .voice-user {

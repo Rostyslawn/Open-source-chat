@@ -60,7 +60,6 @@
                             <span class="voice-channel-name">Voice #{{ $voice_count }}</span>
                         </div>
                         <button class="voice-channel-join">Join</button>
-                        <span class="voice-channel-count">0</span>
                     </div>
                     <div class="voice-channel-users"></div>
                     <button class="voice-channel-leave">Leave Channel</button>
