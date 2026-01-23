@@ -110,4 +110,31 @@ class VoiceController extends Controller
 
         return response()->json(['users' => $activeUsers]);
     }
+
+    public function presenceLeft(Request $request)
+    {
+        $request->validate([
+            'channel_id' => 'required|string',
+            'user_id' => 'required|integer',
+            'user_name' => 'required|string',
+        ]);
+
+        $cacheKey = "voice_channel_{$request->channel_id}_users";
+        $users = Cache::get($cacheKey, []);
+
+        if (!is_array($users)) {
+            $users = [];
+        }
+
+        unset($users[$request->user_id]);
+        Cache::forever($cacheKey, $users);
+
+        event(new VoiceLeftEvent(
+            $request->input('channel_id'),
+            $request->input('user_id'),
+            $request->input('user_name')
+        ));
+
+        return response()->json(['status' => true]);
+    }
 }

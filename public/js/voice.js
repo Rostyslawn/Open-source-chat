@@ -12,8 +12,8 @@ class VoiceChat {
 
         this.iceServers = {
             iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' }
+                {urls: 'stun:stun.l.google.com:19302'},
+                {urls: 'stun:stun1.l.google.com:19302'}
             ]
         };
 
@@ -52,49 +52,35 @@ class VoiceChat {
         voices_count.forEach(channelId => {
             window.Echo.join(`voice-channel-${channelId}`)
                 .here(users => {
-                    // НЕ ДОБАВЛЯЕМ ВСЕХ presence подписчиков!
-                    console.log(`[Channel ${channelId}] .here() - Presence subscribers (NOT voice users):`, users);
-
-                    // Сохраняем только для WebRTC логики
                     this.channelUsers.set(channelId, new Set(users.map(u => u.id)));
-
-                    // ЗАГРУЖАЕМ РЕАЛЬНЫХ активных пользователей с сервера
                     this.loadActiveUsers(channelId);
                 })
                 .joining(user => {
-                    // console.log(`[Channel ${channelId}] .joining() - User subscribed to presence:`, user.name);
-                    // const users = this.channelUsers.get(channelId) || new Set();
-                    // users.add(user.id);
-                    // this.channelUsers.set(channelId, users);
+                    const users = this.channelUsers.get(channelId) || new Set();
+                    users.add(user.id);
+                    this.channelUsers.set(channelId, users);
                 })
                 .leaving(user => {
-                    console.log(`[Channel ${channelId}] .leaving() - User left presence:`, user.name);
                     const users = this.channelUsers.get(channelId) || new Set();
                     users.delete(user.id);
                     this.channelUsers.set(channelId, users);
 
-                    // Удаляем из UI (fallback если пользователь закрыл страницу)
                     this.removeUserFromChannel(channelId, user.id);
+                    this.notifyPresenceLeft(channelId, user.id, user.name);
 
                     if (this.currentChannelId === channelId) {
                         this.closePeerConnection(user.id);
                     }
                 })
                 .listen('.voice-user-joined', (data) => {
-                    console.log(`[Channel ${channelId}] EVENT .voice-user-joined:`, data.userName);
-
-                    // ДОПИСАЛ
                     const users = this.channelUsers.get(channelId) || new Set();
                     users.add(data.userId);
                     this.channelUsers.set(channelId, users);
 
-                    // ДОБАВЛЯЕМ пользователя в UI у ВСЕХ
                     this.addUserToChannel(channelId, data.userId, data.userName, data.userAvatar);
 
-                    // Если мы сами в этом канале, устанавливаем WebRTC
                     if (this.currentChannelId === channelId) {
                         if (data.userId !== current_user_id && this.isPolite(data.userId)) {
-                            console.log(`[Channel ${channelId}] Initiating WebRTC to:`, data.userId);
                             this.closePeerConnection(data.userId);
                             setTimeout(() => {
                                 this.initiateConnection(data.userId);
@@ -103,7 +89,7 @@ class VoiceChat {
                     }
                 })
                 .listen('.voice-user-left', (data) => {
-                    console.log(`[Channel ${channelId}] EVENT .voice-user-left:`, data.userName);
+                    // this.notifyPresenceLeft(channelId, data.userId, data.userName);
                     this.removeUserFromChannel(channelId, data.userId);
 
                     if (this.currentChannelId === channelId) {
@@ -111,7 +97,6 @@ class VoiceChat {
                     }
                 })
                 .listen('.voice-mute-status', (data) => {
-                    console.log(`[Channel ${channelId}] EVENT .voice-mute-status`);
                     this.userMuteStatus.set(data.userId, data.isMuted);
                     this.updateUserMuteUI(channelId, data.userId, data.isMuted);
                 })
@@ -123,10 +108,23 @@ class VoiceChat {
         });
     }
 
+    notifyPresenceLeft(channelId, userId, userName) {
+        fetch('/voice/presence-left', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify({
+                channel_id: channelId,
+                user_id: userId,
+                user_name: userName
+            })
+        }).catch(error => console.error('Error notifying presence left:', error));
+    }
+
     async loadActiveUsers(channelId) {
         try {
-            console.log(`[Channel ${channelId}] 🔍 LOADING ACTIVE USERS FROM SERVER...`);
-
             const response = await fetch(`/voice/active-users?channel_id=${channelId}`, {
                 method: 'GET',
                 headers: {
@@ -139,37 +137,19 @@ class VoiceChat {
 
             const data = await response.json();
 
-            // ДОДЕЛАТЬ
             if (Object.values(data.users).length > 0) {
                 Object.values(data.users).forEach(user => {
-                    this.addUserToChannel(channelId, user.id, user.name, user.avatar);
-                })
+                    if (user.id !== current_user_id) {
+                        this.addUserToChannel(channelId, user.id, user.name, user.avatar);
+                    }
+                });
             }
-
-            // if (data.users && Object.keys(data.users).length > 0) {
-            //     Object.values(data.users).forEach(user => {
-            //         console.log(`[Channel ${channelId}] ➕ Adding user to UI:`, user.name);
-            //         this.addUserToChannel(channelId, user.id, user.name, user.avatar);
-            //     });
-            // } else {
-            //     console.log(`[Channel ${channelId}] ❌ No active users`);
-            //     // Убедимся что контейнер скрыт если пуст
-            //     const channel = document.querySelector(`.voice-channel[data-channel-id="${channelId}"]`);
-            //     if (channel) {
-            //         const usersContainer = channel.querySelector('.voice-channel-users');
-            //         if (usersContainer && usersContainer.children.length === 0) {
-            //             usersContainer.style.display = 'none';
-            //         }
-            //     }
-            // }
         } catch (error) {
-            console.error(`[Channel ${channelId}] ⚠️ ERROR loading active users:`, error);
+            console.error(`Error loading active users:`, error);
         }
     }
 
     async joinChannel(channelId) {
-        console.log('=== JOINING VOICE CHANNEL ===');
-
         if (this.currentChannelId) {
             await this.leaveChannel();
         }
@@ -188,10 +168,8 @@ class VoiceChat {
             this.updateChannelActiveState(channelId, true);
             this.updateGlobalUI();
 
-            // Отправляем событие ВСЕМ
             await this.broadcastJoined(channelId);
 
-            // Устанавливаем WebRTC с теми кто уже в канале
             const users = this.channelUsers.get(channelId) || new Set();
             users.forEach(userId => {
                 if (userId !== current_user_id && this.isPolite(userId)) {
@@ -199,10 +177,8 @@ class VoiceChat {
                     this.initiateConnection(userId);
                 }
             });
-
-            console.log('=== SUCCESSFULLY JOINED ===');
         } catch (error) {
-            console.error('ERROR joining voice channel:', error);
+            console.error('Error joining voice channel:', error);
             alert('Could not access microphone. Please check permissions.');
         }
     }
@@ -258,7 +234,7 @@ class VoiceChat {
 
         try {
             this.makingOffer.set(userId, true);
-            const offer = await pc.createOffer({ offerToReceiveAudio: true });
+            const offer = await pc.createOffer({offerToReceiveAudio: true});
             await pc.setLocalDescription(offer);
 
             this.sendSignal(userId, 'offer', {
@@ -293,7 +269,8 @@ class VoiceChat {
                 document.body.appendChild(remoteAudio);
             }
             remoteAudio.srcObject = event.streams[0];
-            remoteAudio.play().catch(e => {});
+            remoteAudio.play().catch(e => {
+            });
         };
 
         pc.onicecandidate = (event) => {
@@ -320,7 +297,7 @@ class VoiceChat {
     }
 
     async handleSignal(data) {
-        const { userId, type, signal } = data;
+        const {userId, type, signal} = data;
         if (!this.currentChannelId) return;
 
         try {
@@ -435,7 +412,7 @@ class VoiceChat {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
             },
-            body: JSON.stringify({ channel_id: channelId })
+            body: JSON.stringify({channel_id: channelId})
         }).catch(error => console.error('Error broadcasting joined:', error));
     }
 
@@ -446,7 +423,7 @@ class VoiceChat {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
             },
-            body: JSON.stringify({ channel_id: channelId })
+            body: JSON.stringify({channel_id: channelId})
         }).catch(error => console.error('Error broadcasting left:', error));
     }
 
@@ -498,10 +475,7 @@ class VoiceChat {
         if (!usersContainer) return;
 
         let userElement = usersContainer.querySelector(`.voice-user[data-user-id="${userId}"]`);
-        if (userElement) {
-            console.log(`[Channel ${channelId}] User ${userName} already in UI, skipping`);
-            return;
-        }
+        if (userElement) return;
 
         userElement = document.createElement('div');
         userElement.className = 'voice-user';
@@ -526,11 +500,7 @@ class VoiceChat {
         `;
 
         usersContainer.appendChild(userElement);
-
-        // Показываем контейнер если CSS его скрывает
         usersContainer.style.display = 'block';
-
-        console.log(`[Channel ${channelId}] ✅ User ${userName} added to DOM, container visible`);
     }
 
     removeUserFromChannel(channelId, userId) {
@@ -544,7 +514,6 @@ class VoiceChat {
 
         this.userMuteStatus.delete(userId);
 
-        // Скрываем контейнер если он пустой
         const usersContainer = channel.querySelector('.voice-channel-users');
         if (usersContainer && usersContainer.children.length === 0) {
             usersContainer.style.display = 'none';
