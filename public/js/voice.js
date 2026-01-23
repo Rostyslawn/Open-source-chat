@@ -49,19 +49,21 @@ class VoiceChat {
     }
 
     setupChannelListeners() {
-        ['1', '2', '3'].forEach(channelId => {
+        voices_count.forEach(channelId => {
             window.Echo.join(`voice-channel-${channelId}`)
                 .here(users => {
+                    console.log(`[Channel ${channelId}] .here() - Users already in channel:`, users);
                     this.channelUsers.set(channelId, new Set(users.map(u => u.id)));
-                    this.updateChannelUI(channelId);
                 })
                 .joining(user => {
+                    console.log(`[Channel ${channelId}] .joining() - User joining:`, user);
                     const users = this.channelUsers.get(channelId) || new Set();
                     users.add(user.id);
                     this.channelUsers.set(channelId, users);
                     this.updateChannelUI(channelId);
                 })
                 .leaving(user => {
+                    console.log(`[Channel ${channelId}] .leaving() - User leaving:`, user);
                     const users = this.channelUsers.get(channelId) || new Set();
                     users.delete(user.id);
                     this.channelUsers.set(channelId, users);
@@ -72,28 +74,40 @@ class VoiceChat {
                     }
                 })
                 .listen('.voice-user-joined', (data) => {
-                    if (this.currentChannelId === channelId && data.userId !== current_user_id) {
-                        if (this.isPolite(data.userId)) {
+                    console.log(`[Channel ${channelId}] EVENT .voice-user-joined:`, data);
+
+                    if (this.currentChannelId === channelId) {
+                        console.log(`[Channel ${channelId}] Adding user to UI:`, data.userId, data.userName);
+                        this.addUserToChannel(channelId, data.userId, data.userName, data.userAvatar);
+
+                        if (data.userId !== current_user_id && this.isPolite(data.userId)) {
+                            console.log(`[Channel ${channelId}] Initiating connection to user:`, data.userId);
                             this.closePeerConnection(data.userId);
                             setTimeout(() => {
                                 this.initiateConnection(data.userId);
                             }, 500);
                         }
                     }
-                    this.addUserToChannel(channelId, data.userId, data.userName, data.userAvatar);
                 })
                 .listen('.voice-user-left', (data) => {
-                    this.removeUserFromChannel(channelId, data.userId);
+                    console.log(`[Channel ${channelId}] EVENT .voice-user-left:`, data);
+
                     if (this.currentChannelId === channelId) {
+                        this.removeUserFromChannel(channelId, data.userId);
                         this.closePeerConnection(data.userId);
                     }
                 })
                 .listen('.voice-mute-status', (data) => {
+                    console.log(`[Channel ${channelId}] EVENT .voice-mute-status:`, data);
                     this.userMuteStatus.set(data.userId, data.isMuted);
-                    this.updateUserMuteUI(channelId, data.userId, data.isMuted);
+
+                    if (this.currentChannelId === channelId) {
+                        this.updateUserMuteUI(channelId, data.userId, data.isMuted);
+                    }
                 })
                 .listen('.voice-signal', (data) => {
                     if (this.currentChannelId === channelId && data.targetUserId === current_user_id) {
+                        console.log(`[Channel ${channelId}] EVENT .voice-signal:`, data.type);
                         this.handleSignal(data);
                     }
                 });
@@ -101,11 +115,18 @@ class VoiceChat {
     }
 
     async joinChannel(channelId) {
+        console.log('=== JOINING VOICE CHANNEL ===');
+        console.log('Channel ID:', channelId);
+        console.log('Current user ID:', current_user_id);
+        console.log('Current user name:', current_user_name);
+
         if (this.currentChannelId) {
+            console.log('Already in channel, leaving first:', this.currentChannelId);
             await this.leaveChannel();
         }
 
         try {
+            console.log('Requesting microphone access...');
             this.localStream = await navigator.mediaDevices.getUserMedia({
                 audio: {
                     echoCancellation: true,
@@ -114,22 +135,42 @@ class VoiceChat {
                 },
                 video: false
             });
+            console.log('Microphone access granted');
 
             this.currentChannelId = channelId;
+            console.log('Set currentChannelId to:', channelId);
+
+            const userAvatarElement = document.querySelector('.voice-user[data-user-id="' + current_user_id + '"] .voice-user-avatar img');
+            const currentUserAvatar = userAvatarElement ? userAvatarElement.src : '/default-avatar.png';
+            console.log('Current user avatar:', currentUserAvatar);
+
+            console.log('Updating channel active state...');
+            this.updateChannelActiveState(channelId, true);
+
+            console.log('Adding current user to UI...');
+            this.addUserToChannel(channelId, current_user_id, current_user_name, currentUserAvatar);
+
+            console.log('Updating global UI...');
             this.updateGlobalUI();
 
+            console.log('Broadcasting joined event...');
             await this.broadcastJoined(channelId);
+            console.log('Broadcast complete');
 
             const users = this.channelUsers.get(channelId) || new Set();
+            console.log('Existing users in channel:', Array.from(users));
+
             users.forEach(userId => {
                 if (userId !== current_user_id && this.isPolite(userId)) {
+                    console.log('Initiating connection to existing user:', userId);
                     this.closePeerConnection(userId);
                     this.initiateConnection(userId);
                 }
             });
 
-            this.updateChannelActiveState(channelId, true);
+            console.log('=== SUCCESSFULLY JOINED VOICE CHANNEL ===');
         } catch (error) {
+            console.error('ERROR joining voice channel:', error);
             alert('Could not access microphone. Please check permissions.');
         }
     }
@@ -137,11 +178,18 @@ class VoiceChat {
     async leaveChannel() {
         if (!this.currentChannelId) return;
 
+        console.log('=== LEAVING VOICE CHANNEL ===');
+        console.log('Channel ID:', this.currentChannelId);
+
+        const channelId = this.currentChannelId;
+
         if (this.localStream) {
+            console.log('Stopping local stream...');
             this.localStream.getTracks().forEach(track => track.stop());
             this.localStream = null;
         }
 
+        console.log('Closing peer connections...');
         this.peerConnections.forEach((pc, userId) => {
             this.closePeerConnection(userId);
         });
@@ -151,19 +199,24 @@ class VoiceChat {
         this.ignoreOffer.clear();
         this.pendingCandidates.clear();
 
-        await this.broadcastLeft(this.currentChannelId);
+        console.log('Broadcasting left event...');
+        await this.broadcastLeft(channelId);
 
-        this.updateChannelActiveState(this.currentChannelId, false);
+        console.log('Updating UI...');
+        this.updateChannelActiveState(channelId, false);
         this.currentChannelId = null;
         this.isMuted = false;
 
         this.updateGlobalUI();
+        console.log('=== LEFT VOICE CHANNEL ===');
     }
 
     async toggleMute() {
         if (!this.localStream || !this.currentChannelId) return;
 
         this.isMuted = !this.isMuted;
+        console.log('Toggled mute:', this.isMuted);
+
         this.localStream.getAudioTracks().forEach(track => {
             track.enabled = !this.isMuted;
         });
@@ -181,6 +234,7 @@ class VoiceChat {
             return;
         }
 
+        console.log('Initiating connection to user:', userId);
         const pc = this.createPeerConnection(userId);
 
         try {
@@ -191,12 +245,14 @@ class VoiceChat {
             });
 
             await pc.setLocalDescription(offer);
+            console.log('Sending offer to user:', userId);
 
             this.sendSignal(userId, 'offer', {
                 type: offer.type,
                 sdp: btoa(offer.sdp)
             });
         } catch (error) {
+            console.error('Error creating offer for user:', userId, error);
             this.closePeerConnection(userId);
         } finally {
             this.makingOffer.set(userId, false);
@@ -204,6 +260,7 @@ class VoiceChat {
     }
 
     createPeerConnection(userId) {
+        console.log('Creating peer connection for user:', userId);
         const pc = new RTCPeerConnection(this.iceServers);
         this.peerConnections.set(userId, pc);
         this.pendingCandidates.set(userId, []);
@@ -215,6 +272,7 @@ class VoiceChat {
         }
 
         pc.ontrack = (event) => {
+            console.log('Received remote track from user:', userId);
             let remoteAudio = document.getElementById(`remote-audio-${userId}`);
             if (!remoteAudio) {
                 remoteAudio = new Audio();
@@ -238,11 +296,14 @@ class VoiceChat {
         };
 
         pc.oniceconnectionstatechange = () => {
+            console.log('ICE connection state for user', userId, ':', pc.iceConnectionState);
             if (pc.iceConnectionState === 'failed') {
+                console.log('Connection failed, closing peer connection for user:', userId);
                 this.closePeerConnection(userId);
 
                 const users = this.channelUsers.get(this.currentChannelId) || new Set();
                 if (this.currentChannelId && users.has(userId) && this.isPolite(userId)) {
+                    console.log('Retrying connection in 3 seconds...');
                     setTimeout(() => {
                         this.initiateConnection(userId);
                     }, 3000);
@@ -268,10 +329,13 @@ class VoiceChat {
             } else if (type === 'ice-candidate') {
                 await this.handleIceCandidate(userId, signal);
             }
-        } catch (error) {}
+        } catch (error) {
+            console.error('Error handling signal:', error);
+        }
     }
 
     async handleOffer(userId, signal) {
+        console.log('Handling offer from user:', userId);
         const polite = this.isPolite(userId);
         let pc = this.peerConnections.get(userId);
 
@@ -281,10 +345,12 @@ class VoiceChat {
         const ignoreOffer = !polite && offerCollision;
 
         if (ignoreOffer) {
+            console.log('Ignoring offer due to collision (impolite)');
             return;
         }
 
         if (offerCollision) {
+            console.log('Offer collision detected, restarting connection');
             this.closePeerConnection(userId);
             pc = null;
         }
@@ -303,6 +369,7 @@ class VoiceChat {
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
 
+        console.log('Sending answer to user:', userId);
         this.sendSignal(userId, 'answer', {
             type: answer.type,
             sdp: btoa(answer.sdp)
@@ -312,9 +379,11 @@ class VoiceChat {
     }
 
     async handleAnswer(userId, signal) {
+        console.log('Handling answer from user:', userId);
         const pc = this.peerConnections.get(userId);
 
         if (!pc || pc.signalingState !== 'have-local-offer') {
+            console.log('Invalid state for answer, ignoring');
             return;
         }
 
@@ -354,6 +423,7 @@ class VoiceChat {
 
         if (!pc || pending.length === 0) return;
 
+        console.log('Processing', pending.length, 'pending candidates for user:', userId);
         for (const signal of pending) {
             try {
                 await pc.addIceCandidate(new RTCIceCandidate({
@@ -361,7 +431,9 @@ class VoiceChat {
                     sdpMLineIndex: signal.sdpMLineIndex,
                     sdpMid: signal.sdpMid
                 }));
-            } catch (error) {}
+            } catch (error) {
+                console.error('Error adding pending ICE candidate:', error);
+            }
         }
 
         this.pendingCandidates.set(userId, []);
@@ -382,7 +454,7 @@ class VoiceChat {
                 type: type,
                 signal: signal
             })
-        }).catch(error => {});
+        }).catch(error => console.error('Error sending signal:', error));
     }
 
     broadcastJoined(channelId) {
@@ -393,7 +465,7 @@ class VoiceChat {
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
             },
             body: JSON.stringify({ channel_id: channelId })
-        }).catch(error => {});
+        }).catch(error => console.error('Error broadcasting joined:', error));
     }
 
     broadcastLeft(channelId) {
@@ -404,7 +476,7 @@ class VoiceChat {
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
             },
             body: JSON.stringify({ channel_id: channelId })
-        }).catch(error => {});
+        }).catch(error => console.error('Error broadcasting left:', error));
     }
 
     broadcastMuteStatus(channelId) {
@@ -418,7 +490,7 @@ class VoiceChat {
                 channel_id: channelId,
                 is_muted: this.isMuted
             })
-        }).catch(error => {});
+        }).catch(error => console.error('Error broadcasting mute status:', error));
     }
 
     closePeerConnection(userId) {
@@ -448,8 +520,12 @@ class VoiceChat {
     }
 
     updateChannelActiveState(channelId, isActive) {
+        console.log('Updating channel active state:', channelId, isActive);
         const channel = document.querySelector(`.voice-channel[data-channel-id="${channelId}"]`);
-        if (!channel) return;
+        if (!channel) {
+            console.log('Channel element not found!');
+            return;
+        }
 
         if (isActive) {
             channel.classList.add('active');
@@ -463,48 +539,63 @@ class VoiceChat {
     }
 
     addUserToChannel(channelId, userId, userName, userAvatar) {
+        console.log('>>> addUserToChannel called:', { channelId, userId, userName, userAvatar });
+
         const channel = document.querySelector(`.voice-channel[data-channel-id="${channelId}"]`);
-        if (!channel) return;
+        if (!channel) {
+            console.log("ERROR: Can't find voice channel with id:", channelId);
+            return;
+        }
 
         const usersContainer = channel.querySelector('.voice-channel-users');
-        if (!usersContainer) return;
+        if (!usersContainer) {
+            console.log("ERROR: Can't find voice-channel-users container");
+            return;
+        }
 
         let userElement = usersContainer.querySelector(`.voice-user[data-user-id="${userId}"]`);
 
-        if (!userElement) {
-            userElement = document.createElement('div');
-            userElement.className = 'voice-user';
-            if (userId === current_user_id) {
-                userElement.classList.add('current-user');
-            }
-            userElement.dataset.userId = userId;
-
-            const isMuted = this.userMuteStatus.get(userId) || (userId === current_user_id && this.isMuted);
-
-            userElement.innerHTML = `
-                <div class="voice-user-avatar">
-                    <img src="${userAvatar}" alt="${userName}">
-                </div>
-                <span class="voice-user-name">${userName}</span>
-                <div class="voice-user-status ${isMuted ? 'muted' : ''}">
-                    ${isMuted ?
-                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>' :
-                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>'
-            }
-                </div>
-            `;
-
-            usersContainer.appendChild(userElement);
+        if (userElement) {
+            console.log('User already in UI, skipping');
+            return;
         }
+
+        console.log('Creating user element...');
+        userElement = document.createElement('div');
+        userElement.className = 'voice-user';
+        if (userId === current_user_id) {
+            userElement.classList.add('current-user');
+        }
+        userElement.dataset.userId = userId;
+
+        const isMuted = this.userMuteStatus.get(userId) || (userId === current_user_id && this.isMuted);
+
+        userElement.innerHTML = `
+            <div class="voice-user-avatar">
+                <img src="${userAvatar}" alt="${userName}">
+            </div>
+            <span class="voice-user-name">${userName}</span>
+            <div class="voice-user-status ${isMuted ? 'muted' : ''}">
+                ${isMuted ?
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>' :
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>'
+        }
+            </div>
+        `;
+
+        usersContainer.appendChild(userElement);
+        console.log('User element added to DOM');
     }
 
     removeUserFromChannel(channelId, userId) {
+        console.log('Removing user from channel:', channelId, userId);
         const channel = document.querySelector(`.voice-channel[data-channel-id="${channelId}"]`);
         if (!channel) return;
 
         const userElement = channel.querySelector(`.voice-user[data-user-id="${userId}"]`);
         if (userElement) {
             userElement.remove();
+            console.log('User element removed');
         }
 
         this.userMuteStatus.delete(userId);
