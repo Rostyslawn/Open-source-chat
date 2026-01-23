@@ -66,9 +66,11 @@ class VoiceController extends Controller
         $request->validate([
             'channel_id' => 'required|string',
         ]);
-
         $cacheKey = "voice_channel_{$request->channel_id}_users";
         $users = Cache::get($cacheKey, []);
+        if (!is_array($users)) {
+            $users = [];
+        }
         unset($users[Auth::id()]);
         Cache::forever($cacheKey, $users);
 
