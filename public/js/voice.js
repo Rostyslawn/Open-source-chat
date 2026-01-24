@@ -10,6 +10,7 @@ class VoiceChat {
         this.ignoreOffer = new Map();
         this.pendingCandidates = new Map();
         this.heartbeatInterval = null;
+        this.volumeThreshold = 5; // Шумоподавление
 
         this.iceServers = {
             iceServers: [
@@ -166,7 +167,31 @@ class VoiceChat {
                     }
                 });
             }
-        } catch {}
+        } catch {
+        }
+    }
+
+    monitorAudioLevel(audioElement, userId) {
+        const ctx = new AudioContext();
+        const analyser = ctx.createAnalyser();
+        const source = ctx.createMediaStreamSource(audioElement.srcObject);
+
+        analyser.fftSize = 256;
+        source.connect(analyser);
+
+        const check = () => {
+            const data = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteFrequencyData(data);
+            const avg = data.reduce((a, b) => a + b) / data.length;
+
+            const userEl = document.querySelector(`.voice-user[data-user-id="${userId}"]`);
+            if (userEl) {
+                userEl.classList.toggle('current-user', avg > this.volumeThreshold);
+            }
+
+            if (this.currentChannelId) requestAnimationFrame(check);
+        };
+        check();
     }
 
     async joinChannel(channelId) {
@@ -189,6 +214,11 @@ class VoiceChat {
             this.localStream.getAudioTracks().forEach(track => {
                 track.enabled = !this.isMuted;
             });
+
+            const localAudio = new Audio();
+            localAudio.srcObject = this.localStream;
+            localAudio.muted = true;
+            this.monitorAudioLevel(localAudio, current_user_id);
 
             this.currentChannelId = channelId;
             this.updateChannelActiveState(channelId, true);
@@ -309,6 +339,8 @@ class VoiceChat {
 
             remoteAudio.srcObject = event.streams[0];
             remoteAudio.play();
+
+            this.monitorAudioLevel(remoteAudio, userId);
         };
 
         pc.onicecandidate = (event) => {
@@ -347,7 +379,8 @@ class VoiceChat {
             } else if (type === 'ice-candidate') {
                 await this.handleIceCandidate(userId, signal);
             }
-        } catch {}
+        } catch {
+        }
     }
 
     async handleOffer(userId, signal) {
@@ -406,7 +439,8 @@ class VoiceChat {
 
             await pc.setRemoteDescription(answerDesc);
             await this.processPendingCandidates(userId);
-        } catch {}
+        } catch {
+        }
     }
 
     async handleIceCandidate(userId, signal) {
@@ -426,7 +460,8 @@ class VoiceChat {
                 sdpMLineIndex: signal.sdpMLineIndex,
                 sdpMid: signal.sdpMid
             }));
-        } catch {}
+        } catch {
+        }
     }
 
     async processPendingCandidates(userId) {
@@ -441,7 +476,8 @@ class VoiceChat {
                     sdpMLineIndex: signal.sdpMLineIndex,
                     sdpMid: signal.sdpMid
                 }));
-            } catch {}
+            } catch {
+            }
         }
         this.pendingCandidates.set(userId, []);
     }
@@ -478,7 +514,8 @@ class VoiceChat {
                 })
             });
             return await response.json();
-        } catch {}
+        } catch {
+        }
     }
 
     async broadcastLeft(channelId) {
@@ -491,7 +528,8 @@ class VoiceChat {
                 },
                 body: JSON.stringify({channel_id: channelId})
             });
-        } catch {}
+        } catch {
+        }
     }
 
     async broadcastMuteStatus(channelId) {
@@ -507,7 +545,8 @@ class VoiceChat {
                     is_muted: this.isMuted
                 })
             });
-        } catch {}
+        } catch {
+        }
     }
 
     closePeerConnection(userId) {
@@ -544,7 +583,6 @@ class VoiceChat {
 
         userElement = document.createElement('div');
         userElement.className = 'voice-user';
-        if (userId === current_user_id) userElement.classList.add('current-user');
         userElement.dataset.userId = userId;
 
         userElement.innerHTML = `
