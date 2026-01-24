@@ -14,7 +14,8 @@ class VoiceChat {
         this.iceServers = {
             iceServers: [
                 {urls: 'stun:stun.l.google.com:19302'},
-                {urls: 'stun:stun1.l.google.com:19302'}
+                {urls: 'stun:stun1.l.google.com:19302'},
+                {urls: 'stun:stun2.l.google.com:19302'}
             ]
         };
 
@@ -46,7 +47,7 @@ class VoiceChat {
         });
 
         document.querySelectorAll('.voice-channel-leave').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+            btn.addEventListener('click', () => {
                 this.leaveChannel();
             });
         });
@@ -65,37 +66,41 @@ class VoiceChat {
 
     setupChannelListeners() {
         voices_count.forEach(channelId => {
-            window.Echo.join(`voice-channel-${channelId}`)
-                .here(users => {
-                    this.channelUsers.set(channelId, new Set(users.map(u => u.id)));
-                    this.loadActiveUsers(channelId);
-                })
-                .joining(user => {
-                    const users = this.channelUsers.get(channelId) || new Set();
-                    users.add(user.id);
-                    this.channelUsers.set(channelId, users);
-                })
-                .leaving(user => {
-                    this.handleUserLeft(channelId, user.id, user.name);
-                })
-                .listen('.voice-user-joined', (data) => {
-                    console.log('🟢 JOINED EVENT:', data);
-                    const users = this.channelUsers.get(channelId) || new Set();
-                    users.add(data.userId);
-                    this.channelUsers.set(channelId, users);
+            const echoChannel = window.Echo.join(`voice-channel-${channelId}`);
 
-                    this.addUserToChannel(channelId, data.userId, data.userName, data.userAvatar);
+            echoChannel.here(users => {
+                const userIds = new Set(users.map(u => u.id));
+                this.channelUsers.set(channelId, userIds);
+                this.loadActiveUsers(channelId);
+            });
 
-                    if (this.currentChannelId === channelId) {
-                        if (data.userId !== current_user_id && this.isPolite(data.userId)) {
-                            console.log('🟡 INITIATING CONNECTION TO:', data.userId);
-                            this.closePeerConnection(data.userId);
-                            setTimeout(() => {
-                                this.initiateConnection(data.userId);
-                            }, 500);
-                        }
+            echoChannel.joining(user => {
+                const users = this.channelUsers.get(channelId) || new Set();
+                users.add(user.id);
+                this.channelUsers.set(channelId, users);
+            });
+
+            echoChannel.leaving(user => {
+                this.handleUserLeft(channelId, user.id, user.name);
+            });
+
+            echoChannel.listen('.voice-user-joined', (data) => {
+                const users = this.channelUsers.get(channelId) || new Set();
+                users.add(data.userId);
+                this.channelUsers.set(channelId, users);
+
+                this.addUserToChannel(channelId, data.userId, data.userName, data.userAvatar);
+
+                if (this.currentChannelId === channelId && data.userId !== current_user_id) {
+                    const polite = this.isPolite(data.userId);
+
+                    if (polite) {
+                        setTimeout(() => {
+                            this.initiateConnection(data.userId);
+                        }, 1000);
                     }
-                })
+                }
+            })
                 .listen('.voice-user-left', (data) => {
                     this.handleUserLeft(channelId, data.userId, data.userName);
                 })
@@ -111,7 +116,7 @@ class VoiceChat {
         });
     }
 
-    handleUserLeft(channelId, userId, userName) {
+    handleUserLeft(channelId, userId) {
         const users = this.channelUsers.get(channelId) || new Set();
         users.delete(userId);
         this.channelUsers.set(channelId, users);
@@ -135,8 +140,6 @@ class VoiceChat {
                     body: JSON.stringify({
                         channel_id: this.currentChannelId
                     })
-                }).catch(() => {
-
                 });
             }
         }, 120000);
@@ -159,7 +162,7 @@ class VoiceChat {
                 }
             });
 
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            if (!response.ok) throw new Error();
 
             const data = await response.json();
 
@@ -170,12 +173,12 @@ class VoiceChat {
                     }
                 });
             }
-        } catch (error) {
-            console.error(`Error loading active users:`, error);
-        }
+        } catch {}
     }
 
     async joinChannel(channelId) {
+        channelId = parseInt(channelId);
+
         if (this.currentChannelId) {
             await this.leaveChannel();
         }
@@ -197,15 +200,15 @@ class VoiceChat {
             await this.broadcastJoined(channelId);
             this.startHeartbeat();
 
-            const users = this.channelUsers.get(channelId) || new Set();
-            users.forEach(userId => {
-                if (userId !== current_user_id && this.isPolite(userId)) {
-                    this.closePeerConnection(userId);
-                    this.initiateConnection(userId);
-                }
-            });
-        } catch (error) {
-            console.error('Error joining voice channel:', error);
+            setTimeout(() => {
+                const users = this.channelUsers.get(channelId) || new Set();
+                users.forEach(userId => {
+                    if (userId !== current_user_id && this.isPolite(userId)) {
+                        this.initiateConnection(userId);
+                    }
+                });
+            }, 1500);
+        } catch {
             alert('Could not access microphone. Please check permissions.');
         }
     }
@@ -263,15 +266,21 @@ class VoiceChat {
 
         try {
             this.makingOffer.set(userId, true);
-            const offer = await pc.createOffer({offerToReceiveAudio: true});
+
+            const offer = await pc.createOffer({
+                offerToReceiveAudio: true,
+                offerToReceiveVideo: false
+            });
+
+            if (pc.signalingState !== "stable") return;
+
             await pc.setLocalDescription(offer);
 
             this.sendSignal(userId, 'offer', {
                 type: offer.type,
                 sdp: btoa(offer.sdp)
             });
-        } catch (error) {
-            console.error('Error creating offer:', error);
+        } catch {
             this.closePeerConnection(userId);
         } finally {
             this.makingOffer.set(userId, false);
@@ -297,9 +306,9 @@ class VoiceChat {
                 remoteAudio.autoplay = true;
                 document.body.appendChild(remoteAudio);
             }
+
             remoteAudio.srcObject = event.streams[0];
-            remoteAudio.play().catch(e => {
-            });
+            remoteAudio.play();
         };
 
         pc.onicecandidate = (event) => {
@@ -313,8 +322,9 @@ class VoiceChat {
         };
 
         pc.oniceconnectionstatechange = () => {
-            if (pc.iceConnectionState === 'failed') {
+            if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
                 this.closePeerConnection(userId);
+
                 const users = this.channelUsers.get(this.currentChannelId) || new Set();
                 if (this.currentChannelId && users.has(userId) && this.isPolite(userId)) {
                     setTimeout(() => this.initiateConnection(userId), 3000);
@@ -330,53 +340,73 @@ class VoiceChat {
         if (!this.currentChannelId) return;
 
         try {
-            if (type === 'offer') await this.handleOffer(userId, signal);
-            else if (type === 'answer') await this.handleAnswer(userId, signal);
-            else if (type === 'ice-candidate') await this.handleIceCandidate(userId, signal);
-        } catch (error) {
-            console.error('Error handling signal:', error);
-        }
+            if (type === 'offer') {
+                await this.handleOffer(userId, signal);
+            } else if (type === 'answer') {
+                await this.handleAnswer(userId, signal);
+            } else if (type === 'ice-candidate') {
+                await this.handleIceCandidate(userId, signal);
+            }
+        } catch {}
     }
 
     async handleOffer(userId, signal) {
         const polite = this.isPolite(userId);
         let pc = this.peerConnections.get(userId);
 
-        const offerCollision = pc && (pc.signalingState !== 'stable' || this.makingOffer.get(userId));
-        const ignoreOffer = !polite && offerCollision;
+        const offerCollision = pc && (
+            this.makingOffer.get(userId) ||
+            pc.signalingState !== 'stable'
+        );
 
+        const ignoreOffer = !polite && offerCollision;
         if (ignoreOffer) return;
-        if (offerCollision) {
+
+        if (offerCollision && polite) {
             this.closePeerConnection(userId);
             pc = null;
         }
-        if (!pc) pc = this.createPeerConnection(userId);
 
-        await pc.setRemoteDescription(new RTCSessionDescription({
-            type: signal.type,
-            sdp: atob(signal.sdp)
-        }));
+        if (!pc) {
+            pc = this.createPeerConnection(userId);
+        }
 
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
+        try {
+            const offerDesc = new RTCSessionDescription({
+                type: signal.type,
+                sdp: atob(signal.sdp)
+            });
 
-        this.sendSignal(userId, 'answer', {
-            type: answer.type,
-            sdp: btoa(answer.sdp)
-        });
+            await pc.setRemoteDescription(offerDesc);
 
-        await this.processPendingCandidates(userId);
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+
+            this.sendSignal(userId, 'answer', {
+                type: answer.type,
+                sdp: btoa(answer.sdp)
+            });
+
+            await this.processPendingCandidates(userId);
+        } catch {
+            this.closePeerConnection(userId);
+        }
     }
 
     async handleAnswer(userId, signal) {
         const pc = this.peerConnections.get(userId);
-        if (!pc || pc.signalingState !== 'have-local-offer') return;
+        if (!pc) return;
+        if (pc.signalingState !== 'have-local-offer') return;
 
-        await pc.setRemoteDescription(new RTCSessionDescription({
-            type: signal.type,
-            sdp: atob(signal.sdp)
-        }));
-        await this.processPendingCandidates(userId);
+        try {
+            const answerDesc = new RTCSessionDescription({
+                type: signal.type,
+                sdp: atob(signal.sdp)
+            });
+
+            await pc.setRemoteDescription(answerDesc);
+            await this.processPendingCandidates(userId);
+        } catch {}
     }
 
     async handleIceCandidate(userId, signal) {
@@ -390,11 +420,13 @@ class VoiceChat {
             return;
         }
 
-        await pc.addIceCandidate(new RTCIceCandidate({
-            candidate: signal.candidate,
-            sdpMLineIndex: signal.sdpMLineIndex,
-            sdpMid: signal.sdpMid
-        }));
+        try {
+            await pc.addIceCandidate(new RTCIceCandidate({
+                candidate: signal.candidate,
+                sdpMLineIndex: signal.sdpMLineIndex,
+                sdpMid: signal.sdpMid
+            }));
+        } catch {}
     }
 
     async processPendingCandidates(userId) {
@@ -409,9 +441,7 @@ class VoiceChat {
                     sdpMLineIndex: signal.sdpMLineIndex,
                     sdpMid: signal.sdpMid
                 }));
-            } catch (error) {
-                console.error('Error adding pending ICE candidate:', error);
-            }
+            } catch {}
         }
         this.pendingCandidates.set(userId, []);
     }
@@ -431,43 +461,50 @@ class VoiceChat {
                 type: type,
                 signal: signal
             })
-        }).catch(error => console.error('Error sending signal:', error));
+        });
     }
 
-    broadcastJoined(channelId) {
-        return fetch('/voice/joined', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-            },
-            body: JSON.stringify({channel_id: channelId})
-        }).catch(error => console.error('Error broadcasting joined:', error));
+    async broadcastJoined(channelId) {
+        try {
+            const response = await fetch('/voice/joined', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({channel_id: channelId})
+            });
+            return await response.json();
+        } catch {}
     }
 
-    broadcastLeft(channelId) {
-        return fetch('/voice/left', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-            },
-            body: JSON.stringify({channel_id: channelId})
-        }).catch(error => console.error('Error broadcasting left:', error));
+    async broadcastLeft(channelId) {
+        try {
+            await fetch('/voice/left', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({channel_id: channelId})
+            });
+        } catch {}
     }
 
-    broadcastMuteStatus(channelId) {
-        return fetch('/voice/mute-status', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-            },
-            body: JSON.stringify({
-                channel_id: channelId,
-                is_muted: this.isMuted
-            })
-        }).catch(error => console.error('Error broadcasting mute status:', error));
+    async broadcastMuteStatus(channelId) {
+        try {
+            await fetch('/voice/mute-status', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({
+                    channel_id: channelId,
+                    is_muted: this.isMuted
+                })
+            });
+        } catch {}
     }
 
     closePeerConnection(userId) {
@@ -489,11 +526,7 @@ class VoiceChat {
         const channel = document.querySelector(`.voice-channel[data-channel-id="${channelId}"]`);
         if (!channel) return;
 
-        if (isActive) {
-            channel.classList.add('active');
-        } else {
-            channel.classList.remove('active');
-        }
+        channel.classList.toggle('active', isActive);
     }
 
     addUserToChannel(channelId, userId, userName, userAvatar) {
@@ -508,9 +541,7 @@ class VoiceChat {
 
         userElement = document.createElement('div');
         userElement.className = 'voice-user';
-        if (userId === current_user_id) {
-            userElement.classList.add('current-user');
-        }
+        if (userId === current_user_id) userElement.classList.add('current-user');
         userElement.dataset.userId = userId;
 
         const isMuted = this.userMuteStatus.get(userId) || (userId === current_user_id && this.isMuted);
@@ -521,9 +552,9 @@ class VoiceChat {
             </div>
             <span class="voice-user-name">${userName}</span>
             <div class="voice-user-status ${isMuted ? 'muted' : ''}">
-                ${isMuted ?
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>' :
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>'
+                ${isMuted
+            ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>'
+            : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>'
         }
             </div>
         `;
@@ -537,9 +568,7 @@ class VoiceChat {
         if (!channel) return;
 
         const userElement = channel.querySelector(`.voice-user[data-user-id="${userId}"]`);
-        if (userElement) {
-            userElement.remove();
-        }
+        if (userElement) userElement.remove();
 
         this.userMuteStatus.delete(userId);
 
@@ -559,13 +588,10 @@ class VoiceChat {
         const statusElement = userElement.querySelector('.voice-user-status');
         if (!statusElement) return;
 
-        if (isMuted) {
-            statusElement.classList.add('muted');
-            statusElement.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
-        } else {
-            statusElement.classList.remove('muted');
-            statusElement.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
-        }
+        statusElement.classList.toggle('muted', isMuted);
+        statusElement.innerHTML = isMuted
+            ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>'
+            : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
     }
 
     updateGlobalUI() {
@@ -574,10 +600,10 @@ class VoiceChat {
 
         if (muteBtn) {
             muteBtn.style.display = isInVoice ? 'flex' : 'none';
+            muteBtn.classList.toggle('muted', this.isMuted);
             muteBtn.innerHTML = this.isMuted
                 ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>'
                 : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
-            muteBtn.classList.toggle('muted', this.isMuted);
         }
 
         if (this.currentChannelId) {

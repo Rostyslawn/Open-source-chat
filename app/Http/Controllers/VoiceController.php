@@ -9,12 +9,11 @@ use App\Events\VoiceMuteStatusEvent;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
 
 class VoiceController extends Controller
 {
-    private const CACHE_TTL_HOURS = 2;
-    private const USER_INACTIVE_MINUTES = 5;
+    private const CACHE_TTL_HOURS = 1;
+    private const USER_INACTIVE_MINUTES = 2;
 
     private function getCacheKey($channelId)
     {
@@ -34,9 +33,9 @@ class VoiceController extends Controller
     public function sendSignal(Request $request)
     {
         $request->validate([
-            'channel_id' => 'required|string',
-            'target_user_id' => 'required|integer',
-            'type' => 'required|string|in:offer,answer,ice-candidate',
+            'channel_id' => 'required',
+            'target_user_id' => 'required',
+            'type' => 'required|in:offer,answer,ice-candidate',
             'signal' => 'required',
         ]);
 
@@ -54,13 +53,12 @@ class VoiceController extends Controller
     public function joined(Request $request)
     {
         $request->validate([
-            'channel_id' => 'required|string',
+            'channel_id' => 'required',
         ]);
 
         $cacheKey = $this->getCacheKey($request->channel_id);
         $users = Cache::get($cacheKey, []);
 
-        // Очищаем устаревших пользователей
         $users = $this->cleanExpiredUsers($users);
 
         $userData = [
@@ -88,7 +86,7 @@ class VoiceController extends Controller
     public function left(Request $request)
     {
         $request->validate([
-            'channel_id' => 'required|string',
+            'channel_id' => 'required',
         ]);
 
         $cacheKey = $this->getCacheKey($request->channel_id);
@@ -113,7 +111,7 @@ class VoiceController extends Controller
     public function muteStatus(Request $request)
     {
         $request->validate([
-            'channel_id' => 'required|string',
+            'channel_id' => 'required',
             'is_muted' => 'required|boolean',
         ]);
 
@@ -129,13 +127,12 @@ class VoiceController extends Controller
     public function getActiveUsers(Request $request)
     {
         $request->validate([
-            'channel_id' => 'required|string',
+            'channel_id' => 'required',
         ]);
 
         $cacheKey = $this->getCacheKey($request->channel_id);
         $activeUsers = Cache::get($cacheKey, []);
 
-        // Очищаем устаревших пользователей
         $activeUsers = $this->cleanExpiredUsers($activeUsers);
         Cache::put($cacheKey, $activeUsers, now()->addHours(self::CACHE_TTL_HOURS));
 
@@ -145,7 +142,7 @@ class VoiceController extends Controller
     public function heartbeat(Request $request)
     {
         $request->validate([
-            'channel_id' => 'required|string',
+            'channel_id' => 'required',
         ]);
 
         $cacheKey = $this->getCacheKey($request->channel_id);
