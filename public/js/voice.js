@@ -9,6 +9,7 @@ class VoiceChat {
         this.makingOffer = new Map();
         this.ignoreOffer = new Map();
         this.pendingCandidates = new Map();
+        this.heartbeatInterval = null;
 
         this.iceServers = {
             iceServers: [
@@ -19,6 +20,21 @@ class VoiceChat {
 
         this.initializeUI();
         this.setupChannelListeners();
+        this.setupBeforeUnload();
+    }
+
+    setupBeforeUnload() {
+        window.addEventListener('beforeunload', () => {
+            if (this.currentChannelId) {
+                navigator.sendBeacon(
+                    '/voice/left',
+                    new Blob([JSON.stringify({
+                        channel_id: this.currentChannelId,
+                        _token: document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    })], {type: 'application/json'})
+                );
+            }
+        });
     }
 
     initializeUI() {
@@ -31,7 +47,6 @@ class VoiceChat {
 
         document.querySelectorAll('.voice-channel-leave').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                const channelId = e.target.closest('.voice-channel').dataset.channelId;
                 this.leaveChannel();
             });
         });
@@ -61,18 +76,10 @@ class VoiceChat {
                     this.channelUsers.set(channelId, users);
                 })
                 .leaving(user => {
-                    const users = this.channelUsers.get(channelId) || new Set();
-                    users.delete(user.id);
-                    this.channelUsers.set(channelId, users);
-
-                    this.removeUserFromChannel(channelId, user.id);
-                    this.notifyPresenceLeft(channelId, user.id, user.name);
-
-                    if (this.currentChannelId === channelId) {
-                        this.closePeerConnection(user.id);
-                    }
+                    this.handleUserLeft(channelId, user.id, user.name);
                 })
                 .listen('.voice-user-joined', (data) => {
+                    console.log('🟢 JOINED EVENT:', data);
                     const users = this.channelUsers.get(channelId) || new Set();
                     users.add(data.userId);
                     this.channelUsers.set(channelId, users);
@@ -81,6 +88,7 @@ class VoiceChat {
 
                     if (this.currentChannelId === channelId) {
                         if (data.userId !== current_user_id && this.isPolite(data.userId)) {
+                            console.log('🟡 INITIATING CONNECTION TO:', data.userId);
                             this.closePeerConnection(data.userId);
                             setTimeout(() => {
                                 this.initiateConnection(data.userId);
@@ -89,12 +97,7 @@ class VoiceChat {
                     }
                 })
                 .listen('.voice-user-left', (data) => {
-                    // this.notifyPresenceLeft(channelId, data.userId, data.userName);
-                    this.removeUserFromChannel(channelId, data.userId);
-
-                    if (this.currentChannelId === channelId) {
-                        this.closePeerConnection(data.userId);
-                    }
+                    this.handleUserLeft(channelId, data.userId, data.userName);
                 })
                 .listen('.voice-mute-status', (data) => {
                     this.userMuteStatus.set(data.userId, data.isMuted);
@@ -108,19 +111,42 @@ class VoiceChat {
         });
     }
 
-    notifyPresenceLeft(channelId, userId, userName) {
-        fetch('/voice/presence-left', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-            },
-            body: JSON.stringify({
-                channel_id: channelId,
-                user_id: userId,
-                user_name: userName
-            })
-        }).catch(error => console.error('Error notifying presence left:', error));
+    handleUserLeft(channelId, userId, userName) {
+        const users = this.channelUsers.get(channelId) || new Set();
+        users.delete(userId);
+        this.channelUsers.set(channelId, users);
+
+        this.removeUserFromChannel(channelId, userId);
+
+        if (this.currentChannelId === channelId) {
+            this.closePeerConnection(userId);
+        }
+    }
+
+    startHeartbeat() {
+        this.heartbeatInterval = setInterval(() => {
+            if (this.currentChannelId) {
+                fetch('/voice/heartbeat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    },
+                    body: JSON.stringify({
+                        channel_id: this.currentChannelId
+                    })
+                }).catch(() => {
+
+                });
+            }
+        }, 120000);
+    }
+
+    stopHeartbeat() {
+        if (this.heartbeatInterval) {
+            clearInterval(this.heartbeatInterval);
+            this.heartbeatInterval = null;
+        }
     }
 
     async loadActiveUsers(channelId) {
@@ -169,6 +195,7 @@ class VoiceChat {
             this.updateGlobalUI();
 
             await this.broadcastJoined(channelId);
+            this.startHeartbeat();
 
             const users = this.channelUsers.get(channelId) || new Set();
             users.forEach(userId => {
@@ -187,6 +214,8 @@ class VoiceChat {
         if (!this.currentChannelId) return;
 
         const channelId = this.currentChannelId;
+
+        this.stopHeartbeat();
 
         if (this.localStream) {
             this.localStream.getTracks().forEach(track => track.stop());

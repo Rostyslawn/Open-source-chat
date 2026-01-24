@@ -13,6 +13,24 @@ use Illuminate\Support\Facades\Log;
 
 class VoiceController extends Controller
 {
+    private const CACHE_TTL_HOURS = 2;
+    private const USER_INACTIVE_MINUTES = 5;
+
+    private function getCacheKey($channelId)
+    {
+        return "voice_channel_{$channelId}_users";
+    }
+
+    private function cleanExpiredUsers($users)
+    {
+        $now = now()->timestamp;
+        $maxAge = self::USER_INACTIVE_MINUTES * 60;
+
+        return array_filter($users, function($user) use ($now, $maxAge) {
+            return isset($user['last_seen']) && ($now - $user['last_seen']) < $maxAge;
+        });
+    }
+
     public function sendSignal(Request $request)
     {
         $request->validate([
@@ -39,17 +57,23 @@ class VoiceController extends Controller
             'channel_id' => 'required|string',
         ]);
 
-        $cacheKey = "voice_channel_{$request->channel_id}_users";
+        $cacheKey = $this->getCacheKey($request->channel_id);
         $users = Cache::get($cacheKey, []);
+
+        // Очищаем устаревших пользователей
+        $users = $this->cleanExpiredUsers($users);
 
         $userData = [
             'id' => Auth::id(),
             'name' => Auth::user()->name,
             'avatar' => Auth::user()->avatar,
+            'joined_at' => now()->timestamp,
+            'last_seen' => now()->timestamp,
         ];
 
         $users[Auth::id()] = $userData;
-        Cache::forever($cacheKey, $users);
+
+        Cache::put($cacheKey, $users, now()->addHours(self::CACHE_TTL_HOURS));
 
         event(new VoiceJoinedEvent(
             $request->input('channel_id'),
@@ -66,13 +90,16 @@ class VoiceController extends Controller
         $request->validate([
             'channel_id' => 'required|string',
         ]);
-        $cacheKey = "voice_channel_{$request->channel_id}_users";
+
+        $cacheKey = $this->getCacheKey($request->channel_id);
         $users = Cache::get($cacheKey, []);
+
         if (!is_array($users)) {
             $users = [];
         }
+
         unset($users[Auth::id()]);
-        Cache::forever($cacheKey, $users);
+        Cache::put($cacheKey, $users, now()->addHours(self::CACHE_TTL_HOURS));
 
         event(new VoiceLeftEvent(
             $request->input('channel_id'),
@@ -105,36 +132,36 @@ class VoiceController extends Controller
             'channel_id' => 'required|string',
         ]);
 
-        $cacheKey = "voice_channel_{$request->channel_id}_users";
+        $cacheKey = $this->getCacheKey($request->channel_id);
         $activeUsers = Cache::get($cacheKey, []);
+
+        // Очищаем устаревших пользователей
+        $activeUsers = $this->cleanExpiredUsers($activeUsers);
+        Cache::put($cacheKey, $activeUsers, now()->addHours(self::CACHE_TTL_HOURS));
 
         return response()->json(['users' => $activeUsers]);
     }
 
-    public function presenceLeft(Request $request)
+    public function heartbeat(Request $request)
     {
         $request->validate([
             'channel_id' => 'required|string',
-            'user_id' => 'required|integer',
-            'user_name' => 'required|string',
         ]);
 
-        $cacheKey = "voice_channel_{$request->channel_id}_users";
+        $cacheKey = $this->getCacheKey($request->channel_id);
         $users = Cache::get($cacheKey, []);
 
         if (!is_array($users)) {
             $users = [];
         }
 
-        unset($users[$request->user_id]);
-        Cache::forever($cacheKey, $users);
+        if (isset($users[Auth::id()])) {
+            $users[Auth::id()]['last_seen'] = now()->timestamp;
+            Cache::put($cacheKey, $users, now()->addHours(self::CACHE_TTL_HOURS));
 
-        event(new VoiceLeftEvent(
-            $request->input('channel_id'),
-            $request->input('user_id'),
-            $request->input('user_name')
-        ));
+            return response()->json(['status' => true]);
+        }
 
-        return response()->json(['status' => true]);
+        return response()->json(['status' => false, 'message' => 'User not in channel'], 404);
     }
 }

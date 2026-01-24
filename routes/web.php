@@ -31,7 +31,8 @@ Route::middleware(['auth', VerificationKey::class, BanCheck::class])->group(func
         ->name('voice.mute-status');
     Route::get('/voice/active-users', [VoiceController::class, 'getActiveUsers'])
         ->name('voice.active-users');
-    Route::post('/voice/presence-left', [VoiceController::class, 'presenceLeft']);
+    Route::post('/voice/heartbeat', [VoiceController::class, 'heartbeat'])
+        ->name('voice.heartbeat');
 });
 
 Route::get('/forbidden', function () {
