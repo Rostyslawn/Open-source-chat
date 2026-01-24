@@ -17,12 +17,13 @@ class VoiceJoinedEvent implements ShouldBroadcastNow
     public $userName;
     public $userAvatar;
 
-    public function __construct($channelId, $userId, $userName, $userAvatar)
+    public function __construct($channelId, $userId, $userName, $userAvatar, $isMuted = false)
     {
         $this->channelId = $channelId;
         $this->userId = $userId;
         $this->userName = $userName;
         $this->userAvatar = $userAvatar;
+        $this->isMuted = $isMuted;
     }
 
     public function broadcastOn()

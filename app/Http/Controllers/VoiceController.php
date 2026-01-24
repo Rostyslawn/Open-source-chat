@@ -54,6 +54,7 @@ class VoiceController extends Controller
     {
         $request->validate([
             'channel_id' => 'required',
+            'muted' => 'required|boolean',
         ]);
 
         $cacheKey = $this->getCacheKey($request->channel_id);
@@ -65,6 +66,7 @@ class VoiceController extends Controller
             'id' => Auth::id(),
             'name' => Auth::user()->name,
             'avatar' => Auth::user()->avatar,
+            'muted' => $request->muted,
             'joined_at' => now()->timestamp,
             'last_seen' => now()->timestamp,
         ];
@@ -77,7 +79,8 @@ class VoiceController extends Controller
             $request->input('channel_id'),
             Auth::id(),
             Auth::user()->name,
-            Auth::user()->avatar
+            Auth::user()->avatar,
+            $request->muted,
         ));
 
         return response()->json(['status' => true, 'cached_users' => count($users)]);

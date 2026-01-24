@@ -89,7 +89,7 @@ class VoiceChat {
                 users.add(data.userId);
                 this.channelUsers.set(channelId, users);
 
-                this.addUserToChannel(channelId, data.userId, data.userName, data.userAvatar);
+                this.addUserToChannel(channelId, data.userId, data.userName, data.userAvatar, data.isMuted);
 
                 if (this.currentChannelId === channelId && data.userId !== current_user_id) {
                     const polite = this.isPolite(data.userId);
@@ -169,7 +169,7 @@ class VoiceChat {
             if (Object.values(data.users).length > 0) {
                 Object.values(data.users).forEach(user => {
                     if (user.id !== current_user_id) {
-                        this.addUserToChannel(channelId, user.id, user.name, user.avatar);
+                        this.addUserToChannel(channelId, user.id, user.name, user.avatar, user.muted);
                     }
                 });
             }
@@ -479,7 +479,10 @@ class VoiceChat {
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                 },
-                body: JSON.stringify({channel_id: channelId})
+                body: JSON.stringify({
+                    channel_id: channelId,
+                    muted: this.isMuted,
+                })
             });
             return await response.json();
         } catch {}
@@ -536,7 +539,7 @@ class VoiceChat {
         channel.classList.toggle('active', isActive);
     }
 
-    addUserToChannel(channelId, userId, userName, userAvatar) {
+    addUserToChannel(channelId, userId, userName, userAvatar, isMuted) {
         const channel = document.querySelector(`.voice-channel[data-channel-id="${channelId}"]`);
         if (!channel) return;
 
@@ -550,8 +553,6 @@ class VoiceChat {
         userElement.className = 'voice-user';
         if (userId === current_user_id) userElement.classList.add('current-user');
         userElement.dataset.userId = userId;
-
-        const isMuted = this.userMuteStatus.get(userId) || (userId === current_user_id && this.isMuted);
 
         userElement.innerHTML = `
             <div class="voice-user-avatar">
