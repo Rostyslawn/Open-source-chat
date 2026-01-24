@@ -73,7 +73,7 @@ class VoiceController extends Controller
 
         $users[Auth::id()] = $userData;
 
-        Cache::put($cacheKey, $users, now()->addHours(self::CACHE_TTL_HOURS));
+        Cache::forever($cacheKey, $users);
 
         event(new VoiceJoinedEvent(
             $request->input('channel_id'),
@@ -100,7 +100,7 @@ class VoiceController extends Controller
         }
 
         unset($users[Auth::id()]);
-        Cache::put($cacheKey, $users, now()->addHours(self::CACHE_TTL_HOURS));
+        Cache::forever($cacheKey, $users);
 
         event(new VoiceLeftEvent(
             $request->input('channel_id'),
@@ -137,7 +137,7 @@ class VoiceController extends Controller
         $activeUsers = Cache::get($cacheKey, []);
 
         $activeUsers = $this->cleanExpiredUsers($activeUsers);
-        Cache::put($cacheKey, $activeUsers, now()->addHours(self::CACHE_TTL_HOURS));
+        Cache::forever($cacheKey, $activeUsers);
 
         return response()->json(['users' => $activeUsers]);
     }
@@ -157,7 +157,7 @@ class VoiceController extends Controller
 
         if (isset($users[Auth::id()])) {
             $users[Auth::id()]['last_seen'] = now()->timestamp;
-            Cache::put($cacheKey, $users, now()->addHours(self::CACHE_TTL_HOURS));
+            Cache::forever($cacheKey, $users);
 
             return response()->json(['status' => true]);
         }

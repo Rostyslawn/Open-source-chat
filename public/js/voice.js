@@ -52,16 +52,9 @@ class VoiceChat {
             });
         });
 
-        const globalMuteBtn = document.getElementById('muteBtn');
-        const globalLeaveBtn = document.getElementById('leaveVoiceBtn');
-
-        if (globalMuteBtn) {
-            globalMuteBtn.addEventListener('click', () => this.toggleMute());
-        }
-
-        if (globalLeaveBtn) {
-            globalLeaveBtn.addEventListener('click', () => this.leaveChannel());
-        }
+        document.querySelector('#muteBtn').addEventListener('click', () => {
+            this.toggleMute();
+        });
     }
 
     setupChannelListeners() {
@@ -117,11 +110,11 @@ class VoiceChat {
     }
 
     handleUserLeft(channelId, userId) {
+        this.removeUserFromChannel(channelId, userId);
+
         const users = this.channelUsers.get(channelId) || new Set();
         users.delete(userId);
         this.channelUsers.set(channelId, users);
-
-        this.removeUserFromChannel(channelId, userId);
 
         if (this.currentChannelId === channelId) {
             this.closePeerConnection(userId);
