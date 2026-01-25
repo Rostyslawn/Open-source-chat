@@ -20,12 +20,21 @@ Route::middleware(['auth', VerificationKey::class, BanCheck::class])->group(func
     Route::post('/profile/destroy', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::post('unban', [ProfileController::class, 'unban'])->name('profile.unban');
     Route::post('/profile/generatenewkey', [ProfileController::class, 'generatekey'])->name('profile.generatenewkey');
-    Route::post('/voice/signal', [VoiceController::class, 'sendSignal'])
-        ->name('voice.signal');
-    Route::post('/voice/joined', [VoiceController::class, 'joined'])
-        ->name('voice.joined');
-    Route::post('/voice/left', [VoiceController::class, 'left'])
-        ->name('voice.left');
+
+    Route::prefix('voice/')->name('voice.')->group(function () {
+        Route::post('signal', [VoiceController::class, 'sendSignal'])
+            ->name('signal');
+        Route::post('joined', [VoiceController::class, 'joined'])
+            ->name('joined');
+        Route::post('left', [VoiceController::class, 'left'])
+            ->name('left');
+        Route::post('mute-status', [VoiceController::class, 'muteStatus'])
+            ->name('mute-status');
+        Route::get('active-users', [VoiceController::class, 'getActiveUsers'])
+            ->name('active-users');
+        Route::post('heartbeat', [VoiceController::class, 'heartbeat'])
+            ->name('heartbeat');
+    });
 });
 
 Route::get('/forbidden', function () {

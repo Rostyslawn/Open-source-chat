@@ -42,13 +42,55 @@
         </div>
         <span class="users-online-header">Users online:</span>
         <div class="online-users"></div>
+        <div class="voice-channels">
+            <div class="voice-channels-header">Voice Channels</div>
+            @for($voice_count = 1; $voice_count <= 3; $voice_count++)
+                <div class="voice-channel" data-channel-id="{{ $voice_count }}">
+                    <div class="voice-channel-header">
+                        <div class="voice-channel-info">
+                            <div class="voice-channel-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                     stroke-width="2">
+                                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                                    <line x1="12" y1="19" x2="12" y2="23"/>
+                                    <line x1="8" y1="23" x2="16" y2="23"/>
+                                </svg>
+                            </div>
+                            <span class="voice-channel-name">Voice #{{ $voice_count }}</span>
+                        </div>
+                        <button class="voice-channel-join">Join</button>
+                    </div>
+                    <div class="voice-channel-users"></div>
+                    <button class="voice-channel-leave">Leave Channel</button>
+                </div>
+            @endfor
+        </div>
+        <div class="voice-user" data-user-id="{{ Auth::user()->id }}">
+            <div class="voice-user-avatar">
+                <img src="{{ asset(Auth::user()->avatar) }}" alt="User">
+            </div>
+            <span class="voice-user-name">{{ Auth::user()->name }}</span>
+            <div class="voice-user-status">
+                <button title="Mute/Unmute" id="muteBtn"
+                        class="voice-btn mute-btn voice-user-status">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                        <line x1="12" y1="19" x2="12" y2="23"/>
+                        <line x1="8" y1="23" x2="16" y2="23"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
     </div>
     <div class="chat-area">
         <div class="chat-header">
             <div class="chat-header-left">
                 <button @click="sidebarOpen = !sidebarOpen" class="mobile-menu-btn">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M4 6h16M4 12h16M4 18h16"/>
                     </svg>
                 </button>
                 <div class="chat-header-info">
@@ -255,39 +297,14 @@
         </div>
     </div>
 </div>
-<div class="voice-controls">
-    <button id="joinVoiceBtn" class="voice-btn join-voice" title="Join Voice Chat">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-            <line x1="12" y1="19" x2="12" y2="23"/>
-            <line x1="8" y1="23" x2="16" y2="23"/>
-        </svg>
-        <span>Join Voice</span>
-    </button>
-    <button id="muteBtn" class="voice-btn mute-btn" style="display: none;" title="Mute/Unmute">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-            <line x1="12" y1="19" x2="12" y2="23"/>
-            <line x1="8" y1="23" x2="16" y2="23"/>
-        </svg>
-    </button>
-    <button id="leaveVoiceBtn" class="voice-btn leave-voice" style="display: none;" title="Leave Voice Chat">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M23 1L1 23M17 7l-7 7m0 0l-7-7"/>
-        </svg>
-    </button>
-    <div id="voiceIndicator" class="voice-indicator" style="display: none;">
-        <div class="pulse"></div>
-        <span>In Voice</span>
-    </div>
-</div>
-<script src="{{ asset('js/voice.js') }}"></script>
 <script>
+    const voices_count = [1,2,3];
     const current_user_name = "{{ Auth::user()->name }}";
     const current_user_id = {{ Auth::user()->id }};
+    const is_admin = {{ Auth::user()->admin }};
+    const current_user_avatar = "{{ asset(Auth::user()->avatar) }}";
 </script>
+<script src="{{ asset('js/voice.js') }}"></script>
 <script src="{{ asset('js/upload.js') }}"></script>
 <script src="{{ asset('js/index.js') }}"></script>
 </body>

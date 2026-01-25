@@ -8,19 +8,21 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class VoiceLeftEvent implements ShouldBroadcastNow
+class VoiceMuteStatusEvent implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public $channelId;
     public $userId;
-    public $userName;
+    public $isMuted;
+    public $mutedByAdmin;
 
-    public function __construct($channelId, $userId, $userName)
+    public function __construct($channelId, $userId, $isMuted, $mutedByAdmin)
     {
         $this->channelId = $channelId;
         $this->userId = $userId;
-        $this->userName = $userName;
+        $this->isMuted = $isMuted;
+        $this->mutedByAdmin = $mutedByAdmin;
     }
 
     public function broadcastOn()
@@ -30,6 +32,6 @@ class VoiceLeftEvent implements ShouldBroadcastNow
 
     public function broadcastAs()
     {
-        return 'voice-user-left';
+        return 'voice-mute-status';
     }
 }
