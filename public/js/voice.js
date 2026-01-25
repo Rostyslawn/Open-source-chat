@@ -291,7 +291,10 @@ class VoiceChat {
     async toggleMute(userId = null) {
         if (userId && userId !== current_user_id) {
             const currentMuteStatus = this.userMuteStatus.get(userId) || false;
+            const isMutedByAdmin = this.userMutedByAdmin.get(userId) || false;
             const newMuteStatus = !currentMuteStatus;
+
+            if (!newMuteStatus && !isMutedByAdmin) return;
 
             this.userMuteStatus.set(userId, newMuteStatus);
             this.userMutedByAdmin.set(userId, newMuteStatus);

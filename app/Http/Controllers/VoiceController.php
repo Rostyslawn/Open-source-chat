@@ -124,17 +124,20 @@ class VoiceController extends Controller
 
         $targetUserId = $request->input('user_id');
         $isMuted = $request->input('is_muted');
-        $mutedByAdmin = $request->input('muted_by_admin', false);
         $cacheKey = $this->getCacheKey($request->channel_id);
         $users = Cache::get($cacheKey, []);
 
         if ($targetUserId && $targetUserId != Auth::id()) {
             if (!Auth::user()->admin) {
-                return response()->json(['status' => false, 'message' => 'Not authorized'], 403);
+                return response()->json(['status' => false], 403);
             }
 
             if (!isset($users[$targetUserId])) {
-                return response()->json(['status' => false, 'message' => 'User not in channel'], 404);
+                return response()->json(['status' => false], 404);
+            }
+
+            if (!$isMuted && !($users[$targetUserId]['muted_by_admin'] ?? false)) {
+                return response()->json(['status' => false], 400);
             }
 
             $users[$targetUserId]['muted'] = $isMuted;
@@ -152,11 +155,11 @@ class VoiceController extends Controller
         }
 
         if (!isset($users[Auth::id()])) {
-            return response()->json(['status' => false, 'message' => 'User not in channel'], 404);
+            return response()->json(['status' => false], 404);
         }
 
         if ($users[Auth::id()]['muted_by_admin'] ?? false) {
-            return response()->json(['status' => false, 'message' => 'Muted by admin'], 403);
+            return response()->json(['status' => false], 403);
         }
 
         $users[Auth::id()]['muted'] = $isMuted;
@@ -208,6 +211,6 @@ class VoiceController extends Controller
             return response()->json(['status' => true]);
         }
 
-        return response()->json(['status' => false, 'message' => 'User not in channel'], 404);
+        return response()->json(['status' => false], 404);
     }
 }
