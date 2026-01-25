@@ -298,9 +298,10 @@ class VoiceChat {
 
             this.userMuteStatus.set(userId, newMuteStatus);
             this.userMutedByAdmin.set(userId, newMuteStatus);
+            this.updateUserMuteUI(this.currentChannelId, userId, newMuteStatus);
 
             if (this.currentChannelId) {
-                await this.broadcastMuteStatus(this.currentChannelId, userId, newMuteStatus, newMuteStatus);
+                this.broadcastMuteStatus(this.currentChannelId, userId, newMuteStatus, newMuteStatus);
             }
             return;
         }
@@ -320,7 +321,7 @@ class VoiceChat {
         this.updateSelfMuteUI();
 
         if (this.currentChannelId) {
-            await this.broadcastMuteStatus(this.currentChannelId, null, this.isMuted, false);
+            this.broadcastMuteStatus(this.currentChannelId, null, this.isMuted, false);
         }
     }
 
@@ -598,7 +599,7 @@ class VoiceChat {
         };
 
         try {
-            await fetch('/voice/mute-status', {
+            fetch('/voice/mute-status', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -652,6 +653,7 @@ class VoiceChat {
         this.userMuteStatus.set(userId, mutedStatus);
         this.userMutedByAdmin.set(userId, mutedByAdminStatus);
 
+        const statusIconClass = mutedStatus ? (mutedByAdminStatus ? 'muted-by-admin' : 'muted') : '';
         const statusIcon = mutedStatus
             ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>'
             : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
@@ -661,7 +663,7 @@ class VoiceChat {
                 <img src="${userAvatar}" alt="${userName}">
             </div>
             <span class="voice-user-name">${userName}</span>
-            <div class="voice-user-status ${mutedStatus ? 'muted' : ''}" data-user-id="${userId}">
+            <div class="voice-user-status ${statusIconClass}" data-user-id="${userId}">
                 ${statusIcon}
             </div>
         `;
@@ -708,7 +710,14 @@ class VoiceChat {
         const statusElement = userElement.querySelector('.voice-user-status');
         if (!statusElement) return;
 
-        statusElement.classList.toggle('muted', isMuted);
+        const isMutedByAdmin = this.userMutedByAdmin.get(userId) || false;
+
+        statusElement.classList.remove('muted', 'muted-by-admin');
+
+        if (isMuted) {
+            statusElement.classList.add(isMutedByAdmin ? 'muted-by-admin' : 'muted');
+        }
+
         statusElement.innerHTML = isMuted
             ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>'
             : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
