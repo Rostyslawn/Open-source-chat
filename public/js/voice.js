@@ -242,8 +242,8 @@ class VoiceChat {
             this.updateChannelActiveState(channelId, true);
             this.updateSelfMuteUI();
 
-            await this.broadcastJoined(channelId);
-            await this.broadcastMuteStatus(channelId);
+            this.broadcastJoined(channelId);
+            this.broadcastMuteStatus(channelId);
             this.startHeartbeat();
 
             setTimeout(() => {
@@ -560,7 +560,7 @@ class VoiceChat {
 
     async broadcastJoined(channelId) {
         try {
-            const response = await fetch('/voice/joined', {
+            const response = fetch('/voice/joined', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -578,7 +578,7 @@ class VoiceChat {
 
     async broadcastLeft(channelId) {
         try {
-            await fetch('/voice/left', {
+            fetch('/voice/left', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
