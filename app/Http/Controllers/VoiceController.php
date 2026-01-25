@@ -144,12 +144,12 @@ class VoiceController extends Controller
             $users[$targetUserId]['muted_by_admin'] = $isMuted;
             Cache::forever($cacheKey, $users);
 
-            event(new VoiceMuteStatusEvent(
+            broadcast(new VoiceMuteStatusEvent(
                 $request->input('channel_id'),
                 $targetUserId,
                 $isMuted,
                 $isMuted
-            ));
+            ))->toOthers();
 
             return response()->json(['status' => true]);
         }
