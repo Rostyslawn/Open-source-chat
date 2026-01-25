@@ -301,6 +301,7 @@
     const voices_count = [1,2,3];
     const current_user_name = "{{ Auth::user()->name }}";
     const current_user_id = {{ Auth::user()->id }};
+    const is_admin = {{ Auth::user()->admin }};
     const current_user_avatar = "{{ asset(Auth::user()->avatar) }}";
 </script>
 <script src="{{ asset('js/voice.js') }}"></script>
