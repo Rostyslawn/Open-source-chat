@@ -269,7 +269,7 @@ class VoiceChat {
         this.updateGlobalUI();
     }
 
-    async toggleMute() {
+    async toggleMute(userId = null) {
         this.isMuted = !this.isMuted;
 
         if (this.localStream) {
@@ -278,10 +278,10 @@ class VoiceChat {
             });
         }
 
-        this.updateGlobalUI();
+        this.updateGlobalUI(userId);
 
         if (this.currentChannelId) {
-            await this.broadcastMuteStatus(this.currentChannelId);
+            await this.broadcastMuteStatus(this.currentChannelId, userId);
         }
     }
 
@@ -532,7 +532,7 @@ class VoiceChat {
         }
     }
 
-    async broadcastMuteStatus(channelId) {
+    async broadcastMuteStatus(channelId, userId = null) {
         try {
             await fetch('/voice/mute-status', {
                 method: 'POST',
@@ -542,8 +542,11 @@ class VoiceChat {
                 },
                 body: JSON.stringify({
                     channel_id: channelId,
-                    is_muted: this.isMuted
+                    is_muted: this.isMuted,
+                    user_id: userId,
                 })
+            }).then(status => {
+                console.log(JSON.stringify("DATA12312:", status))
             });
         } catch {
         }
@@ -598,6 +601,10 @@ class VoiceChat {
             </div>
         `;
 
+        if (current_user_id != userId) {
+            userElement.addEventListener('click', () => this.toggleMute(userId));
+        }
+
         usersContainer.appendChild(userElement);
         usersContainer.style.display = 'block';
     }
@@ -633,18 +640,37 @@ class VoiceChat {
             : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
     }
 
-    updateGlobalUI() {
-        const muteBtn = document.getElementById('muteBtn');
+    updateGlobalUI(userId = null) {
+        if (userId) {
+            const muteBtns = document.querySelectorAll('.voice-user-status');
 
-        if (muteBtn) {
-            muteBtn.classList.toggle('muted', this.isMuted);
-            muteBtn.innerHTML = this.isMuted
-                ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>'
-                : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
-        }
+            muteBtns.forEach(btn => {
+                if (btn.dataset.userId == userId) {
+                    btn.classList.toggle('muted', this.isMuted);
+                    btn.innerHTML = this.isMuted
+                        ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>'
+                        : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
+                }
+            });
 
-        if (this.currentChannelId) {
-            this.updateUserMuteUI(this.currentChannelId, current_user_id, this.isMuted);
+            console.log("UNMUTED USER ID", userId);
+
+            if (this.currentChannelId) {
+                this.updateUserMuteUI(this.currentChannelId, userId, this.isMuted);
+            }
+        } else {
+            const muteBtn = document.getElementById('muteBtn');
+
+            if (muteBtn) {
+                muteBtn.classList.toggle('muted', this.isMuted);
+                muteBtn.innerHTML = this.isMuted
+                    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>'
+                    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
+            }
+
+            if (this.currentChannelId) {
+                this.updateUserMuteUI(this.currentChannelId, current_user_id, this.isMuted);
+            }
         }
     }
 }

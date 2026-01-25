@@ -116,7 +116,24 @@ class VoiceController extends Controller
         $request->validate([
             'channel_id' => 'required',
             'is_muted' => 'required|boolean',
+            'user_id' => 'nullable|integer|exists:users,id',
         ]);
+
+        $targetUserId = $request->input('user_id');
+
+        if ($targetUserId && $targetUserId != Auth::id()) {
+            if (!Auth::user()->admin) {
+                return response()->json(['status' => false,], 403);
+            }
+
+            event(new VoiceMuteStatusEvent(
+                $request->input('channel_id'),
+                $targetUserId,
+                $request->input('is_muted')
+            ));
+
+            return response()->json(['status' => true]);
+        }
 
         event(new VoiceMuteStatusEvent(
             $request->input('channel_id'),
