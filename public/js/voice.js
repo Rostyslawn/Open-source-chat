@@ -4,8 +4,10 @@ class VoiceChat {
         this.peerConnections = new Map();
         this.currentChannelId = null;
         this.isMuted = false;
+        this.mutedByAdmin = false;
         this.channelUsers = new Map();
         this.userMuteStatus = new Map();
+        this.userMutedByAdmin = new Map();
         this.makingOffer = new Map();
         this.ignoreOffer = new Map();
         this.pendingCandidates = new Map();
@@ -83,7 +85,7 @@ class VoiceChat {
                 users.add(data.userId);
                 this.channelUsers.set(channelId, users);
 
-                this.addUserToChannel(channelId, data.userId, data.userName, data.userAvatar, data.isMuted);
+                this.addUserToChannel(channelId, data.userId, data.userName, data.userAvatar, data.isMuted, data.mutedByAdmin);
 
                 if (this.currentChannelId === channelId && data.userId !== current_user_id) {
                     const polite = this.isPolite(data.userId);
@@ -100,13 +102,19 @@ class VoiceChat {
                 })
                 .listen('.voice-mute-status', (data) => {
                     this.userMuteStatus.set(data.userId, data.isMuted);
+                    this.userMutedByAdmin.set(data.userId, data.mutedByAdmin || false);
                     this.updateUserMuteUI(channelId, data.userId, data.isMuted);
 
-                    if (data.userId === current_user_id && this.localStream) {
+                    if (data.userId === current_user_id) {
                         this.isMuted = data.isMuted;
-                        this.localStream.getAudioTracks().forEach(track => {
-                            track.enabled = !data.isMuted;
-                        });
+                        this.mutedByAdmin = data.mutedByAdmin || false;
+
+                        if (this.localStream) {
+                            this.localStream.getAudioTracks().forEach(track => {
+                                track.enabled = !data.isMuted;
+                            });
+                        }
+
                         this.updateSelfMuteUI();
                     }
                 })
@@ -171,8 +179,9 @@ class VoiceChat {
             if (Object.values(data.users).length > 0) {
                 Object.values(data.users).forEach(user => {
                     if (user.id !== current_user_id) {
-                        this.addUserToChannel(channelId, user.id, user.name, user.avatar, user.muted);
+                        this.addUserToChannel(channelId, user.id, user.name, user.avatar, user.muted, user.muted_by_admin);
                         this.userMuteStatus.set(user.id, user.muted || false);
+                        this.userMutedByAdmin.set(user.id, user.muted_by_admin || false);
                     }
                 });
             }
@@ -275,6 +284,7 @@ class VoiceChat {
 
         this.updateChannelActiveState(channelId, false);
         this.currentChannelId = null;
+        this.mutedByAdmin = false;
         this.updateSelfMuteUI();
     }
 
@@ -284,10 +294,15 @@ class VoiceChat {
             const newMuteStatus = !currentMuteStatus;
 
             this.userMuteStatus.set(userId, newMuteStatus);
+            this.userMutedByAdmin.set(userId, newMuteStatus);
 
             if (this.currentChannelId) {
-                await this.broadcastMuteStatus(this.currentChannelId, userId, newMuteStatus);
+                await this.broadcastMuteStatus(this.currentChannelId, userId, newMuteStatus, newMuteStatus);
             }
+            return;
+        }
+
+        if (this.mutedByAdmin) {
             return;
         }
 
@@ -302,14 +317,18 @@ class VoiceChat {
         this.updateSelfMuteUI();
 
         if (this.currentChannelId) {
-            await this.broadcastMuteStatus(this.currentChannelId);
+            await this.broadcastMuteStatus(this.currentChannelId, null, this.isMuted, false);
         }
     }
 
     updateSelfMuteUI() {
         const muteBtn = document.getElementById('muteBtn');
         if (muteBtn) {
+            const isDisabled = this.mutedByAdmin;
             muteBtn.classList.toggle('muted', this.isMuted);
+            muteBtn.style.opacity = isDisabled ? '0.5' : '1';
+            muteBtn.style.cursor = isDisabled ? 'not-allowed' : 'pointer';
+
             muteBtn.innerHTML = this.isMuted
                 ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>'
                 : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
@@ -567,15 +586,16 @@ class VoiceChat {
         }
     }
 
-    async broadcastMuteStatus(channelId, userId = null, forceMuteStatus = null) {
+    async broadcastMuteStatus(channelId, userId = null, isMuted = null, mutedByAdmin = false) {
         const payload = {
             channel_id: channelId,
-            is_muted: forceMuteStatus !== null ? forceMuteStatus : this.isMuted,
+            is_muted: isMuted !== null ? isMuted : this.isMuted,
             user_id: userId,
+            muted_by_admin: mutedByAdmin,
         };
 
         try {
-            const response = await fetch('/voice/mute-status', {
+            await fetch('/voice/mute-status', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -583,10 +603,7 @@ class VoiceChat {
                 },
                 body: JSON.stringify(payload)
             });
-
-            const result = await response.json();
         } catch(e) {
-            console.error('[BROADCAST] Error:', e);
         }
     }
 
@@ -612,7 +629,7 @@ class VoiceChat {
         channel.classList.toggle('active', isActive);
     }
 
-    addUserToChannel(channelId, userId, userName, userAvatar, isMuted) {
+    addUserToChannel(channelId, userId, userName, userAvatar, isMuted, mutedByAdmin) {
         const channel = document.querySelector(`.voice-channel[data-channel-id="${channelId}"]`);
         if (!channel) return;
 
@@ -627,7 +644,10 @@ class VoiceChat {
         userElement.dataset.userId = userId;
 
         const mutedStatus = isMuted !== undefined ? isMuted : false;
+        const mutedByAdminStatus = mutedByAdmin !== undefined ? mutedByAdmin : false;
+
         this.userMuteStatus.set(userId, mutedStatus);
+        this.userMutedByAdmin.set(userId, mutedByAdminStatus);
 
         const statusIcon = mutedStatus
             ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>'
@@ -667,6 +687,7 @@ class VoiceChat {
         if (userElement) userElement.remove();
 
         this.userMuteStatus.delete(userId);
+        this.userMutedByAdmin.delete(userId);
 
         const usersContainer = channel.querySelector('.voice-channel-users');
         if (usersContainer && usersContainer.children.length === 0) {
@@ -676,19 +697,13 @@ class VoiceChat {
 
     updateUserMuteUI(channelId, userId, isMuted) {
         const channel = document.querySelector(`.voice-channel[data-channel-id="${channelId}"]`);
-        if (!channel) {
-            return;
-        }
+        if (!channel) return;
 
         const userElement = channel.querySelector(`.voice-user[data-user-id="${userId}"]`);
-        if (!userElement) {
-            return;
-        }
+        if (!userElement) return;
 
         const statusElement = userElement.querySelector('.voice-user-status');
-        if (!statusElement) {
-            return;
-        }
+        if (!statusElement) return;
 
         statusElement.classList.toggle('muted', isMuted);
         statusElement.innerHTML = isMuted

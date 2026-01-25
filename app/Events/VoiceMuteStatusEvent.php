@@ -15,12 +15,14 @@ class VoiceMuteStatusEvent implements ShouldBroadcastNow
     public $channelId;
     public $userId;
     public $isMuted;
+    public $mutedByAdmin;
 
-    public function __construct($channelId, $userId, $isMuted)
+    public function __construct($channelId, $userId, $isMuted, $mutedByAdmin)
     {
         $this->channelId = $channelId;
         $this->userId = $userId;
         $this->isMuted = $isMuted;
+        $this->mutedByAdmin = $mutedByAdmin;
     }
 
     public function broadcastOn()
