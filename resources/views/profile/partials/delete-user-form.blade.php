@@ -25,9 +25,8 @@
                     data-username="{{ strtolower($userItem->name) }}">
                     <div class="flex items-center space-x-4 flex-1">
                         <div class="flex-shrink-0">
-                            <div
-                                class="w-10 h-10 rounded-full bg-indigo-600 dark:bg-indigo-500 flex items-center justify-center text-white font-semibold">
-                                {{ strtoupper(substr($userItem->name, 0, 1)) }}
+                            <div class="w-10 h-10 flex items-center justify-center">
+                                <img src="{{ asset($userItem->avatar) }}">
                             </div>
                         </div>
                         <div class="flex-1 min-w-0">
