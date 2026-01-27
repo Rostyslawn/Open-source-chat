@@ -319,14 +319,15 @@ class VoiceChat {
             const currentMuteStatus = this.userMuteStatus.get(userId) || false;
             const isMutedByAdmin = this.userMutedByAdmin.get(userId) || false;
             const newMuteStatus = !currentMuteStatus;
+            const newMuteStatusByAdmin = !isMutedByAdmin;
 
             if (!newMuteStatus && !isMutedByAdmin) return;
 
             this.userMuteStatus.set(userId, newMuteStatus);
-            this.userMutedByAdmin.set(userId, newMuteStatus);
+            this.userMutedByAdmin.set(userId, newMuteStatusByAdmin);
             this.updateUserMuteUI(this.currentChannelId, userId, newMuteStatus);
 
-            this.broadcastMuteStatus(this.currentChannelId, userId, newMuteStatus, newMuteStatus);
+            this.broadcastMuteStatus(this.currentChannelId, userId, newMuteStatus, newMuteStatusByAdmin);
             return;
         }
 
