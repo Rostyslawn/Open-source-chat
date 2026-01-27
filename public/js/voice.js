@@ -275,6 +275,7 @@ class VoiceChat {
                     muted: this.isMuted,
                 })
             });
+            if (!response.ok) return;
 
             const data = await response.json();
 
