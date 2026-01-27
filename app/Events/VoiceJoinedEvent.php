@@ -16,6 +16,8 @@ class VoiceJoinedEvent implements ShouldBroadcastNow
     public $userId;
     public $userName;
     public $userAvatar;
+    public $isMuted;
+    public $isMutedByAdmin;
 
     public function __construct($channelId, $userId, $userName, $userAvatar, $isMuted = false, $isMutedByAdmin = false)
     {

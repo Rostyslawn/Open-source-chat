@@ -20,12 +20,12 @@ class VoiceController extends Controller
         return "voice_channel_{$channelId}_users";
     }
 
-    private function checkAdminMute($userId): bool
+    private function checkAdminMute(int $userId): bool
     {
         $cacheKey = "mute_by_admin_user_{$userId}";
         $userStatus = Cache::get($cacheKey, false);
 
-        return (bool) $userStatus;
+        return (bool)$userStatus;
     }
 
     private function cleanExpiredUsers($users)
@@ -33,7 +33,7 @@ class VoiceController extends Controller
         $now = now()->timestamp;
         $maxAge = self::USER_INACTIVE_MINUTES * 60;
 
-        return array_filter($users, function($user) use ($now, $maxAge) {
+        return array_filter($users, function ($user) use ($now, $maxAge) {
             return isset($user['last_seen']) && ($now - $user['last_seen']) < $maxAge;
         });
     }
@@ -72,51 +72,28 @@ class VoiceController extends Controller
 
         $isMutedByAdmin = $this->checkAdminMute(Auth::id());
 
-        if ($isMutedByAdmin) {
-            $userData = [
-                'id' => Auth::id(),
-                'name' => Auth::user()->name,
-                'avatar' => Auth::user()->avatar,
-                'muted' => true,
-                'muted_by_admin' => true,
-                'joined_at' => now()->timestamp,
-                'last_seen' => now()->timestamp,
-            ];
+        $userData = [
+            'id' => Auth::id(),
+            'name' => Auth::user()->name,
+            'avatar' => Auth::user()->avatar,
+            'muted' => $isMutedByAdmin ? true : $request->muted,
+            'muted_by_admin' => $isMutedByAdmin,
+            'joined_at' => now()->timestamp,
+            'last_seen' => now()->timestamp,
+        ];
 
-            $users[Auth::id()] = $userData;
+        $users[Auth::id()] = $userData;
 
-            Cache::forever($cacheKey, $users);
+        Cache::forever($cacheKey, $users);
 
-            event(new VoiceJoinedEvent(
-                $request->input('channel_id'),
-                Auth::id(),
-                Auth::user()->name,
-                Auth::user()->avatar,
-                true
-            ));
-        } else {
-            $userData = [
-                'id' => Auth::id(),
-                'name' => Auth::user()->name,
-                'avatar' => Auth::user()->avatar,
-                'muted' => $request->muted,
-                'muted_by_admin' => false,
-                'joined_at' => now()->timestamp,
-                'last_seen' => now()->timestamp,
-            ];
-
-            $users[Auth::id()] = $userData;
-
-            Cache::forever($cacheKey, $users);
-
-            event(new VoiceJoinedEvent(
-                $request->input('channel_id'),
-                Auth::id(),
-                Auth::user()->name,
-                Auth::user()->avatar,
-                $request->muted
-            ));
-        }
+        event(new VoiceJoinedEvent(
+            $request->input('channel_id'),
+            Auth::id(),
+            Auth::user()->name,
+            Auth::user()->avatar,
+            $isMutedByAdmin ? true : $request->muted,
+            $isMutedByAdmin
+        ));
 
         return response()->json([
             'status' => true,

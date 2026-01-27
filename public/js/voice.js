@@ -112,7 +112,12 @@ class VoiceChat {
                 users.add(data.userId);
                 this.channelUsers.set(channelId, users);
 
-                this.addUserToChannel(channelId, data.userId, data.userName, data.userAvatar, data.isMuted, data.mutedByAdmin);
+                if (data.userId === current_user_id && this.currentChannelId === channelId) {
+                    this.userMuteStatus.set(current_user_id, data.isMuted);
+                    this.userMutedByAdmin.set(current_user_id, data.isMutedByAdmin);
+                }
+
+                this.addUserToChannel(channelId, data.userId, data.userName, data.userAvatar, data.isMuted, data.isMutedByAdmin);
 
                 if (this.currentChannelId === channelId && data.userId !== current_user_id && this.isPolite(data.userId)) {
                     setTimeout(() => this.initiateConnection(data.userId), 500);
@@ -196,14 +201,12 @@ class VoiceChat {
             if (!container) return;
 
             users.forEach(user => {
-                if (user.id !== current_user_id) {
-                    this.userMuteStatus.set(user.id, user.muted || false);
-                    this.userMutedByAdmin.set(user.id, user.muted_by_admin || false);
+                this.userMuteStatus.set(user.id, user.muted || false);
+                this.userMutedByAdmin.set(user.id, user.muted_by_admin || false);
 
-                    const userElement = this.createUserElement(user.id, user.name, user.avatar, user.muted, user.muted_by_admin);
-                    this.userElements.set(user.id, userElement);
-                    fragment.appendChild(userElement);
-                }
+                const userElement = this.createUserElement(user.id, user.name, user.avatar, user.muted, user.muted_by_admin);
+                this.userElements.set(user.id, userElement);
+                fragment.appendChild(userElement);
             });
 
             container.appendChild(fragment);
@@ -372,7 +375,13 @@ class VoiceChat {
         if (!muteBtn) return;
 
         const isDisabled = this.mutedByAdmin;
-        muteBtn.classList.toggle('muted', this.isMuted);
+
+        muteBtn.classList.remove('muted', 'muted-by-admin');
+
+        if (this.isMuted) {
+            muteBtn.classList.add(this.mutedByAdmin ? 'muted-by-admin' : 'muted');
+        }
+
         muteBtn.style.opacity = isDisabled ? '0.5' : '1';
         muteBtn.style.cursor = isDisabled ? 'not-allowed' : 'pointer';
 
