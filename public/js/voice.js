@@ -253,10 +253,6 @@ class VoiceChat {
                 video: false
             });
 
-            this.localStream.getAudioTracks().forEach(track => {
-                track.enabled = !this.isMuted;
-            });
-
             const localAudio = new Audio();
             localAudio.srcObject = this.localStream;
             localAudio.muted = true;
@@ -264,10 +260,36 @@ class VoiceChat {
 
             this.currentChannelId = channelId;
             this.updateChannelActiveState(channelId, true);
+
+            const response = await fetch('/voice/joined', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': this.getCsrfToken()
+                },
+                body: JSON.stringify({
+                    channel_id: channelId,
+                    muted: this.isMuted,
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.isMutedByAdmin) {
+                this.isMuted = true;
+                this.mutedByAdmin = true;
+            }
+
+            this.localStream.getAudioTracks().forEach(track => {
+                track.enabled = !this.isMuted;
+            });
+
             this.updateSelfMuteUI();
 
-            this.broadcastJoined(channelId);
-            this.broadcastMuteStatus(channelId);
+            if (this.isMuted && !this.mutedByAdmin) {
+                this.broadcastMuteStatus(channelId, null, this.isMuted, false);
+            }
+
             this.startHeartbeat();
 
             setTimeout(() => {
@@ -572,7 +594,7 @@ class VoiceChat {
     }
 
     broadcastJoined(channelId) {
-        fetch('/voice/joined', {
+        return fetch('/voice/joined', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
