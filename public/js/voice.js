@@ -119,7 +119,7 @@ class VoiceChat {
 
                 this.addUserToChannel(channelId, data.userId, data.userName, data.userAvatar, data.isMuted, data.isMutedByAdmin);
 
-                if (this.currentChannelId === channelId && data.userId !== current_user_id && this.isPolite(data.userId)) {
+                if (this.currentChannelId === channelId && data.userId !== current_user_id) {
                     setTimeout(() => this.initiateConnection(data.userId), 500);
                 }
             })
@@ -299,7 +299,7 @@ class VoiceChat {
             setTimeout(() => {
                 const users = this.channelUsers.get(channelId) || new Set();
                 users.forEach(userId => {
-                    if (userId !== current_user_id && this.isPolite(userId)) {
+                    if (userId !== current_user_id) {
                         this.initiateConnection(userId);
                     }
                 });
@@ -462,7 +462,7 @@ class VoiceChat {
                 this.closePeerConnection(userId);
 
                 const users = this.channelUsers.get(this.currentChannelId) || new Set();
-                if (this.currentChannelId && users.has(userId) && this.isPolite(userId)) {
+                if (this.currentChannelId && users.has(userId)) {
                     setTimeout(() => this.initiateConnection(userId), 2000);
                 }
             }
