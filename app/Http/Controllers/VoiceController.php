@@ -15,9 +15,17 @@ class VoiceController extends Controller
     private const CACHE_TTL_HOURS = 1;
     private const USER_INACTIVE_MINUTES = 2;
 
-    private function getCacheKey($channelId)
+    private function getUsersInVoice($channelId)
     {
         return "voice_channel_{$channelId}_users";
+    }
+
+    private function checkAdminMute(int $userId): bool
+    {
+        $cacheKey = "mute_by_admin_user_{$userId}";
+        $userStatus = Cache::get($cacheKey, false);
+
+        return (bool)$userStatus;
     }
 
     private function cleanExpiredUsers($users)
@@ -25,7 +33,7 @@ class VoiceController extends Controller
         $now = now()->timestamp;
         $maxAge = self::USER_INACTIVE_MINUTES * 60;
 
-        return array_filter($users, function($user) use ($now, $maxAge) {
+        return array_filter($users, function ($user) use ($now, $maxAge) {
             return isset($user['last_seen']) && ($now - $user['last_seen']) < $maxAge;
         });
     }
@@ -57,17 +65,19 @@ class VoiceController extends Controller
             'muted' => 'required|boolean',
         ]);
 
-        $cacheKey = $this->getCacheKey($request->channel_id);
+        $cacheKey = $this->getUsersInVoice($request->channel_id);
         $users = Cache::get($cacheKey, []);
 
         $users = $this->cleanExpiredUsers($users);
+
+        $isMutedByAdmin = $this->checkAdminMute(Auth::id());
 
         $userData = [
             'id' => Auth::id(),
             'name' => Auth::user()->name,
             'avatar' => Auth::user()->avatar,
-            'muted' => $request->muted,
-            'muted_by_admin' => false,
+            'muted' => $isMutedByAdmin ? true : $request->muted,
+            'muted_by_admin' => $isMutedByAdmin,
             'joined_at' => now()->timestamp,
             'last_seen' => now()->timestamp,
         ];
@@ -81,11 +91,15 @@ class VoiceController extends Controller
             Auth::id(),
             Auth::user()->name,
             Auth::user()->avatar,
-            $request->muted,
-            false
+            $isMutedByAdmin ? true : $request->muted,
+            $isMutedByAdmin
         ));
 
-        return response()->json(['status' => true, 'cached_users' => count($users)]);
+        return response()->json([
+            'status' => true,
+            'cached_users' => count($users),
+            'isMutedByAdmin' => $isMutedByAdmin,
+        ]);
     }
 
     public function left(Request $request)
@@ -94,7 +108,7 @@ class VoiceController extends Controller
             'channel_id' => 'required',
         ]);
 
-        $cacheKey = $this->getCacheKey($request->channel_id);
+        $cacheKey = $this->getUsersInVoice($request->channel_id);
         $users = Cache::get($cacheKey, []);
 
         if (!is_array($users)) {
@@ -124,7 +138,8 @@ class VoiceController extends Controller
 
         $targetUserId = $request->input('user_id');
         $isMuted = $request->input('is_muted');
-        $cacheKey = $this->getCacheKey($request->channel_id);
+        $isMutedByAdmin = $request->input('muted_by_admin') ?? false;
+        $cacheKey = $this->getUsersInVoice($request->channel_id);
         $users = Cache::get($cacheKey, []);
 
         if ($targetUserId && $targetUserId != Auth::id()) {
@@ -141,14 +156,15 @@ class VoiceController extends Controller
             }
 
             $users[$targetUserId]['muted'] = $isMuted;
-            $users[$targetUserId]['muted_by_admin'] = $isMuted;
+            $users[$targetUserId]['muted_by_admin'] = $isMutedByAdmin;
             Cache::forever($cacheKey, $users);
+            Cache::forever("mute_by_admin_user_{$targetUserId}", $isMutedByAdmin);
 
             broadcast(new VoiceMuteStatusEvent(
                 $request->input('channel_id'),
                 $targetUserId,
                 $isMuted,
-                $isMuted
+                $isMutedByAdmin
             ))->toOthers();
 
             return response()->json(['status' => true]);
@@ -182,7 +198,7 @@ class VoiceController extends Controller
             'channel_id' => 'required',
         ]);
 
-        $cacheKey = $this->getCacheKey($request->channel_id);
+        $cacheKey = $this->getUsersInVoice($request->channel_id);
         $activeUsers = Cache::get($cacheKey, []);
 
         $activeUsers = $this->cleanExpiredUsers($activeUsers);
@@ -197,7 +213,7 @@ class VoiceController extends Controller
             'channel_id' => 'required',
         ]);
 
-        $cacheKey = $this->getCacheKey($request->channel_id);
+        $cacheKey = $this->getUsersInVoice($request->channel_id);
         $users = Cache::get($cacheKey, []);
 
         if (!is_array($users)) {
