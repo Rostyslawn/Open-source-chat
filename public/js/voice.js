@@ -342,18 +342,14 @@ class VoiceChat {
 
     toggleMute(userId = null) {
         if (userId && userId !== current_user_id) {
-            const currentMuteStatus = this.userMuteStatus.get(userId) || false;
-            const isMutedByAdmin = this.userMutedByAdmin.get(userId) || false;
-            const newMuteStatus = !currentMuteStatus;
+            const isMutedByAdmin = this.userMutedByAdmin.get(userId) ?? false;
             const newMuteStatusByAdmin = !isMutedByAdmin;
 
-            if (!newMuteStatus && !isMutedByAdmin) return;
-
-            this.userMuteStatus.set(userId, newMuteStatus);
+            this.userMuteStatus.set(userId, newMuteStatusByAdmin);
             this.userMutedByAdmin.set(userId, newMuteStatusByAdmin);
-            this.updateUserMuteUI(this.currentChannelId, userId, newMuteStatus);
+            this.updateUserMuteUI(this.currentChannelId, userId, newMuteStatusByAdmin);
 
-            this.broadcastMuteStatus(this.currentChannelId, userId, newMuteStatus, newMuteStatusByAdmin);
+            this.broadcastMuteStatus(this.currentChannelId, userId, true, newMuteStatusByAdmin);
             return;
         }
 
