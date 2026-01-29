@@ -116,7 +116,7 @@
                             </button>
                         </x-slot>
                         <x-slot name="content">
-                            <x-dropdown-link :href="route('profile.edit')">
+                            <x-dropdown-link :href="route('profile.edit')" target="_blank">
                                 {{ __('Profile') }}
                             </x-dropdown-link>
                             <form method="POST" action="{{ route('logout') }}">
@@ -166,7 +166,6 @@
                 </form>
             </div>
         </div>
-
         <div class="messages">
             @foreach($messages_data as $message)
                 @if($message->sender_id == Auth::id())
