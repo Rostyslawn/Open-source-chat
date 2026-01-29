@@ -1,49 +1,108 @@
+// Interfaces
+interface RTCSignal {
+    type: string;
+    sdp: string;
+}
+
+interface ICECandidateSignal {
+    candidate: string;
+    sdpMLineIndex: number | null;
+    sdpMid: string | null;
+}
+
+interface SignalData {
+    userId: number;
+    targetUserId: number;
+    type: 'offer' | 'answer' | 'ice-candidate';
+    signal: RTCSignal | ICECandidateSignal;
+}
+
+interface VoiceUserJoinedData {
+    userId: number;
+    userName: string;
+    userAvatar: string;
+    isMuted: boolean;
+    isMutedByAdmin: boolean;
+}
+
+interface VoiceUserLeftData {
+    userId: number;
+}
+
+interface VoiceMuteStatusData {
+    userId: number;
+    isMuted: boolean;
+    mutedByAdmin?: boolean;
+}
+
+interface ActiveUser {
+    id: number;
+    name: string;
+    avatar: string;
+    muted: boolean;
+    muted_by_admin: boolean;
+}
+
+interface ActiveUsersResponse {
+    users: Record<string, ActiveUser>;
+}
+
+interface JoinedResponse {
+    isMutedByAdmin?: boolean;
+}
+
+interface CachedElements {
+    muteBtn: HTMLButtonElement | null;
+    csrfToken: string | null;
+}
+
 class VoiceChat {
+    private localStream: MediaStream | null = null;
+    private peerConnections: Map<number, RTCPeerConnection> = new Map();
+    private currentChannelId: number | null = null;
+    private isMuted: boolean = false;
+    private mutedByAdmin: boolean = false;
+    private channelUsers: Map<number, Set<number>> = new Map();
+    private userMuteStatus: Map<number, boolean> = new Map();
+    private userMutedByAdmin: Map<number, boolean> = new Map();
+    private makingOffer: Map<number, boolean> = new Map();
+    private ignoreOffer: Map<number, boolean> = new Map();
+    private pendingCandidates: Map<number, ICECandidateSignal[]> = new Map();
+    private heartbeatInterval: number | null = null;
+    private volumeThreshold: number = 5;
+
+    private userElements: Map<number, HTMLDivElement> = new Map();
+    private channelContainers: Map<number, HTMLDivElement> = new Map();
+    private cachedElements: CachedElements = {
+        muteBtn: null,
+        csrfToken: null
+    };
+
+    private iceServers: RTCConfiguration = {
+        iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' }
+        ]
+    };
+
     constructor() {
-        this.localStream = null;
-        this.peerConnections = new Map();
-        this.currentChannelId = null;
-        this.isMuted = false;
-        this.mutedByAdmin = false;
-        this.channelUsers = new Map();
-        this.userMuteStatus = new Map();
-        this.userMutedByAdmin = new Map();
-        this.makingOffer = new Map();
-        this.ignoreOffer = new Map();
-        this.pendingCandidates = new Map();
-        this.heartbeatInterval = null;
-        this.volumeThreshold = 5;
-
-        this.userElements = new Map();
-        this.channelContainers = new Map();
-        this.cachedElements = {
-            muteBtn: null,
-            csrfToken: null
-        };
-
-        this.iceServers = {
-            iceServers: [
-                {urls: 'stun:stun.l.google.com:19302'},
-                {urls: 'stun:stun1.l.google.com:19302'},
-                {urls: 'stun:stun2.l.google.com:19302'}
-            ]
-        };
-
         this.initializeUI();
         this.setupChannelListeners();
         this.setupBeforeUnload();
     }
 
-    getCsrfToken() {
+    private getCsrfToken(): string {
         if (!this.cachedElements.csrfToken) {
-            this.cachedElements.csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            const token = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.getAttribute('content');
+            this.cachedElements.csrfToken = token || '';
         }
         return this.cachedElements.csrfToken;
     }
 
-    getChannelContainer(channelId) {
+    private getChannelContainer(channelId: number): HTMLDivElement | undefined {
         if (!this.channelContainers.has(channelId)) {
-            const container = document.querySelector(`.voice-channel[data-channel-id="${channelId}"] .voice-channel-users`);
+            const container = document.querySelector<HTMLDivElement>(`.voice-channel[data-channel-id="${channelId}"] .voice-channel-users`);
             if (container) {
                 this.channelContainers.set(channelId, container);
             }
@@ -51,7 +110,7 @@ class VoiceChat {
         return this.channelContainers.get(channelId);
     }
 
-    setupBeforeUnload() {
+    private setupBeforeUnload(): void {
         window.addEventListener('beforeunload', () => {
             if (this.currentChannelId) {
                 navigator.sendBeacon(
@@ -59,27 +118,31 @@ class VoiceChat {
                     new Blob([JSON.stringify({
                         channel_id: this.currentChannelId,
                         _token: this.getCsrfToken()
-                    })], {type: 'application/json'})
+                    })], { type: 'application/json' })
                 );
             }
         });
     }
 
-    initializeUI() {
-        document.querySelectorAll('.voice-channel-join').forEach(btn => {
+    private initializeUI(): void {
+        document.querySelectorAll<HTMLButtonElement>('.voice-channel-join').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                const channelId = e.target.closest('.voice-channel').dataset.channelId;
-                this.joinChannel(channelId);
+                const target = e.target as HTMLElement;
+                const channel = target.closest<HTMLDivElement>('.voice-channel');
+                const channelId = channel?.dataset.channelId;
+                if (channelId) {
+                    this.joinChannel(channelId);
+                }
             });
         });
 
-        document.querySelectorAll('.voice-channel-leave').forEach(btn => {
+        document.querySelectorAll<HTMLButtonElement>('.voice-channel-leave').forEach(btn => {
             btn.addEventListener('click', () => {
                 this.leaveChannel();
             });
         });
 
-        this.cachedElements.muteBtn = document.querySelector('#muteBtn');
+        this.cachedElements.muteBtn = document.querySelector<HTMLButtonElement>('#muteBtn');
         if (this.cachedElements.muteBtn) {
             this.cachedElements.muteBtn.addEventListener('click', () => {
                 this.toggleMute();
@@ -87,46 +150,54 @@ class VoiceChat {
         }
     }
 
-    setupChannelListeners() {
-        voices_count.forEach(channelId => {
+    private setupChannelListeners(): void {
+        voices_count.forEach((channelId: number) => {
             const echoChannel = window.Echo.join(`voice-channel-${channelId}`);
 
-            echoChannel.here(users => {
-                const userIds = new Set(users.map(u => u.id));
+            echoChannel.here((users: any[]) => {
+                const userIds = new Set(users.map((u: any) => u.id as number));
                 this.channelUsers.set(channelId, userIds);
                 this.loadActiveUsers(channelId);
             });
 
-            echoChannel.joining(user => {
-                const users = this.channelUsers.get(channelId) || new Set();
-                users.add(user.id);
+            echoChannel.joining((user: any) => {
+                const users = this.channelUsers.get(channelId) || new Set<number>();
+                users.add(user.id as number);
                 this.channelUsers.set(channelId, users);
             });
 
-            echoChannel.leaving(user => {
-                this.handleUserLeft(channelId, user.id);
+            echoChannel.leaving((user: any) => {
+                this.handleUserLeft(channelId, user.id as number);
             });
 
-            echoChannel.listen('.voice-user-joined', (data) => {
-                const users = this.channelUsers.get(channelId) || new Set();
-                users.add(data.userId);
-                this.channelUsers.set(channelId, users);
+            echoChannel
+                .listen('.voice-user-joined', (data: VoiceUserJoinedData) => {
+                    const users = this.channelUsers.get(channelId) || new Set<number>();
+                    users.add(data.userId);
+                    this.channelUsers.set(channelId, users);
 
-                if (data.userId === current_user_id && this.currentChannelId === channelId) {
-                    this.userMuteStatus.set(current_user_id, data.isMuted);
-                    this.userMutedByAdmin.set(current_user_id, data.isMutedByAdmin);
-                }
+                    if (data.userId === current_user_id && this.currentChannelId === channelId) {
+                        this.userMuteStatus.set(current_user_id, data.isMuted);
+                        this.userMutedByAdmin.set(current_user_id, data.isMutedByAdmin);
+                    }
 
-                this.addUserToChannel(channelId, data.userId, data.userName, data.userAvatar, data.isMuted, data.isMutedByAdmin);
+                    this.addUserToChannel(
+                        channelId,
+                        data.userId,
+                        data.userName,
+                        data.userAvatar,
+                        data.isMuted,
+                        data.isMutedByAdmin
+                    );
 
-                if (this.currentChannelId === channelId && data.userId !== current_user_id) {
-                    setTimeout(() => this.initiateConnection(data.userId), 500);
-                }
-            })
-                .listen('.voice-user-left', (data) => {
+                    if (this.currentChannelId === channelId && data.userId !== current_user_id) {
+                        setTimeout(() => this.initiateConnection(data.userId), 500);
+                    }
+                })
+                .listen('.voice-user-left', (data: VoiceUserLeftData) => {
                     this.handleUserLeft(channelId, data.userId);
                 })
-                .listen('.voice-mute-status', (data) => {
+                .listen('.voice-mute-status', (data: VoiceMuteStatusData) => {
                     this.userMuteStatus.set(data.userId, data.isMuted);
                     this.userMutedByAdmin.set(data.userId, data.mutedByAdmin || false);
                     this.updateUserMuteUI(channelId, data.userId, data.isMuted);
@@ -144,7 +215,7 @@ class VoiceChat {
                         this.updateSelfMuteUI();
                     }
                 })
-                .listen('.voice-signal', (data) => {
+                .listen('.voice-signal', (data: SignalData) => {
                     if (this.currentChannelId === channelId && data.targetUserId === current_user_id) {
                         this.handleSignal(data);
                     }
@@ -152,10 +223,10 @@ class VoiceChat {
         });
     }
 
-    handleUserLeft(channelId, userId) {
+    private handleUserLeft(channelId: number, userId: number): void {
         this.removeUserFromChannel(channelId, userId);
 
-        const users = this.channelUsers.get(channelId) || new Set();
+        const users = this.channelUsers.get(channelId) || new Set<number>();
         users.delete(userId);
         this.channelUsers.set(channelId, users);
 
@@ -164,8 +235,8 @@ class VoiceChat {
         }
     }
 
-    startHeartbeat() {
-        this.heartbeatInterval = setInterval(() => {
+    private startHeartbeat(): void {
+        this.heartbeatInterval = window.setInterval(() => {
             if (this.currentChannelId) {
                 fetch('/voice/heartbeat', {
                     method: 'POST',
@@ -173,23 +244,23 @@ class VoiceChat {
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': this.getCsrfToken()
                     },
-                    body: JSON.stringify({channel_id: this.currentChannelId})
+                    body: JSON.stringify({ channel_id: this.currentChannelId })
                 }).catch(() => {});
             }
         }, 120000);
     }
 
-    stopHeartbeat() {
+    private stopHeartbeat(): void {
         if (this.heartbeatInterval) {
             clearInterval(this.heartbeatInterval);
             this.heartbeatInterval = null;
         }
     }
 
-    loadActiveUsers(channelId) {
+    private loadActiveUsers(channelId: number): void {
         fetch(`/voice/active-users?channel_id=${channelId}`)
             .then(response => response.ok ? response.json() : null)
-            .then(data => {
+            .then((data: ActiveUsersResponse | null) => {
                 if (!data) return;
 
                 const users = Object.values(data.users);
@@ -203,7 +274,13 @@ class VoiceChat {
                     this.userMuteStatus.set(user.id, user.muted || false);
                     this.userMutedByAdmin.set(user.id, user.muted_by_admin || false);
 
-                    const userElement = this.createUserElement(user.id, user.name, user.avatar, user.muted, user.muted_by_admin);
+                    const userElement = this.createUserElement(
+                        user.id,
+                        user.name,
+                        user.avatar,
+                        user.muted,
+                        user.muted_by_admin
+                    );
                     this.userElements.set(user.id, userElement);
                     fragment.appendChild(userElement);
                 });
@@ -214,17 +291,19 @@ class VoiceChat {
             .catch(() => {});
     }
 
-    monitorAudioLevel(audioElement, userId) {
+    private monitorAudioLevel(audioElement: HTMLAudioElement, userId: number): void {
+        if (!audioElement.srcObject) return;
+
         const ctx = new AudioContext();
         const analyser = ctx.createAnalyser();
-        const source = ctx.createMediaStreamSource(audioElement.srcObject);
+        const source = ctx.createMediaStreamSource(audioElement.srcObject as MediaStream);
 
         analyser.fftSize = 256;
         source.connect(analyser);
 
         const data = new Uint8Array(analyser.frequencyBinCount);
 
-        const check = () => {
+        const check = (): void => {
             if (!this.currentChannelId) return;
 
             analyser.getByteFrequencyData(data);
@@ -243,8 +322,8 @@ class VoiceChat {
         check();
     }
 
-    async joinChannel(channelId) {
-        channelId = parseInt(channelId);
+    async joinChannel(channelId: string | number): Promise<void> {
+        const channelIdNum = parseInt(channelId.toString());
 
         if (this.currentChannelId) {
             await this.leaveChannel();
@@ -265,8 +344,8 @@ class VoiceChat {
             localAudio.muted = true;
             this.monitorAudioLevel(localAudio, current_user_id);
 
-            this.currentChannelId = channelId;
-            this.updateChannelActiveState(channelId, true);
+            this.currentChannelId = channelIdNum;
+            this.updateChannelActiveState(channelIdNum, true);
 
             const response = await fetch('/voice/joined', {
                 method: 'POST',
@@ -275,14 +354,14 @@ class VoiceChat {
                     'X-CSRF-TOKEN': this.getCsrfToken()
                 },
                 body: JSON.stringify({
-                    channel_id: channelId,
+                    channel_id: channelIdNum,
                     muted: this.isMuted,
                 })
             });
 
             if (!response.ok) return;
 
-            const data = await response.json();
+            const data: JoinedResponse = await response.json();
 
             if (data.isMutedByAdmin) {
                 this.isMuted = true;
@@ -296,25 +375,26 @@ class VoiceChat {
             this.updateSelfMuteUI();
 
             if (this.isMuted && !this.mutedByAdmin) {
-                this.broadcastMuteStatus(channelId, null, this.isMuted, false);
+                this.broadcastMuteStatus(channelIdNum, null, this.isMuted, false);
             }
 
             this.startHeartbeat();
 
             setTimeout(() => {
-                const users = this.channelUsers.get(channelId) || new Set();
+                const users = this.channelUsers.get(channelIdNum) || new Set<number>();
                 users.forEach(userId => {
                     if (userId !== current_user_id) {
                         this.initiateConnection(userId);
                     }
                 });
             }, 800);
-        } catch {
+        } catch (error) {
+            console.error('Microphone access error:', error);
             alert('Could not access microphone. Please check permissions.');
         }
     }
 
-    leaveChannel() {
+    leaveChannel(): void {
         if (!this.currentChannelId) return;
 
         const channelId = this.currentChannelId;
@@ -332,7 +412,7 @@ class VoiceChat {
         this.ignoreOffer.clear();
         this.pendingCandidates.clear();
 
-        document.querySelectorAll('[id^="remote-audio-"]').forEach(audio => audio.remove());
+        document.querySelectorAll<HTMLAudioElement>('[id^="remote-audio-"]').forEach(audio => audio.remove());
 
         this.updateChannelActiveState(channelId, false);
         this.currentChannelId = null;
@@ -341,7 +421,7 @@ class VoiceChat {
         this.broadcastLeft(channelId);
     }
 
-    toggleMute(userId = null) {
+    toggleMute(userId: number | null = null): void {
         if (userId && userId !== current_user_id) {
             const isMutedByAdmin = this.userMutedByAdmin.get(userId) ?? false;
             const newMuteStatusByAdmin = !isMutedByAdmin;
@@ -349,9 +429,10 @@ class VoiceChat {
             this.userMuteStatus.set(userId, newMuteStatusByAdmin);
             this.userMutedByAdmin.set(userId, newMuteStatusByAdmin);
 
-            this.updateUserMuteUI(this.currentChannelId, userId, newMuteStatusByAdmin);
-
-            this.broadcastMuteStatus(this.currentChannelId, userId, true, newMuteStatusByAdmin);
+            if (this.currentChannelId) {
+                this.updateUserMuteUI(this.currentChannelId, userId, newMuteStatusByAdmin);
+                this.broadcastMuteStatus(this.currentChannelId, userId, true, newMuteStatusByAdmin);
+            }
             return;
         }
 
@@ -366,10 +447,12 @@ class VoiceChat {
         }
 
         this.updateSelfMuteUI();
-        this.broadcastMuteStatus(this.currentChannelId, null, this.isMuted, false);
+        if (this.currentChannelId) {
+            this.broadcastMuteStatus(this.currentChannelId, null, this.isMuted, false);
+        }
     }
 
-    updateSelfMuteUI() {
+    private updateSelfMuteUI(): void {
         const muteBtn = this.cachedElements.muteBtn;
         if (!muteBtn) return;
 
@@ -392,11 +475,11 @@ class VoiceChat {
         }
     }
 
-    isPolite(otherUserId) {
+    private isPolite(otherUserId: number): boolean {
         return current_user_id > otherUserId;
     }
 
-    async initiateConnection(userId) {
+    private async initiateConnection(userId: number): Promise<void> {
         if (this.peerConnections.has(userId)) return;
 
         const pc = this.createPeerConnection(userId);
@@ -413,30 +496,35 @@ class VoiceChat {
 
             await pc.setLocalDescription(offer);
 
-            this.sendSignal(userId, 'offer', {
-                type: offer.type,
-                sdp: btoa(offer.sdp)
-            });
-        } catch {
+            if (offer.sdp) {
+                this.sendSignal(userId, 'offer', {
+                    type: offer.type,
+                    sdp: btoa(offer.sdp)
+                });
+            }
+        } catch (error) {
+            console.error('Error initiating connection:', error);
             this.closePeerConnection(userId);
         } finally {
             this.makingOffer.set(userId, false);
         }
     }
 
-    createPeerConnection(userId) {
+    private createPeerConnection(userId: number): RTCPeerConnection {
         const pc = new RTCPeerConnection(this.iceServers);
         this.peerConnections.set(userId, pc);
         this.pendingCandidates.set(userId, []);
 
         if (this.localStream) {
             this.localStream.getTracks().forEach(track => {
-                pc.addTrack(track, this.localStream);
+                if (this.localStream) {
+                    pc.addTrack(track, this.localStream);
+                }
             });
         }
 
-        pc.ontrack = (event) => {
-            let remoteAudio = document.getElementById(`remote-audio-${userId}`);
+        pc.ontrack = (event: RTCTrackEvent) => {
+            let remoteAudio = document.getElementById(`remote-audio-${userId}`) as HTMLAudioElement | null;
             if (!remoteAudio) {
                 remoteAudio = new Audio();
                 remoteAudio.id = `remote-audio-${userId}`;
@@ -448,7 +536,7 @@ class VoiceChat {
             this.monitorAudioLevel(remoteAudio, userId);
         };
 
-        pc.onicecandidate = (event) => {
+        pc.onicecandidate = (event: RTCPeerConnectionIceEvent) => {
             if (event.candidate) {
                 this.sendSignal(userId, 'ice-candidate', {
                     candidate: event.candidate.candidate,
@@ -462,7 +550,7 @@ class VoiceChat {
             if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
                 this.closePeerConnection(userId);
 
-                const users = this.channelUsers.get(this.currentChannelId) || new Set();
+                const users = this.channelUsers.get(this.currentChannelId!) || new Set<number>();
                 if (this.currentChannelId && users.has(userId)) {
                     setTimeout(() => this.initiateConnection(userId), 2000);
                 }
@@ -472,23 +560,24 @@ class VoiceChat {
         return pc;
     }
 
-    async handleSignal(data) {
-        const {userId, type, signal} = data;
+    private async handleSignal(data: SignalData): Promise<void> {
+        const { userId, type, signal } = data;
         if (!this.currentChannelId) return;
 
         try {
             if (type === 'offer') {
-                await this.handleOffer(userId, signal);
+                await this.handleOffer(userId, signal as RTCSignal);
             } else if (type === 'answer') {
-                await this.handleAnswer(userId, signal);
+                await this.handleAnswer(userId, signal as RTCSignal);
             } else if (type === 'ice-candidate') {
-                await this.handleIceCandidate(userId, signal);
+                await this.handleIceCandidate(userId, signal as ICECandidateSignal);
             }
-        } catch {
+        } catch (error) {
+            console.error('Error handling signal:', error);
         }
     }
 
-    async handleOffer(userId, signal) {
+    private async handleOffer(userId: number, signal: RTCSignal): Promise<void> {
         const polite = this.isPolite(userId);
         let pc = this.peerConnections.get(userId);
 
@@ -502,7 +591,7 @@ class VoiceChat {
 
         if (offerCollision && polite) {
             this.closePeerConnection(userId);
-            pc = null;
+            pc = undefined;
         }
 
         if (!pc) {
@@ -511,39 +600,43 @@ class VoiceChat {
 
         try {
             await pc.setRemoteDescription(new RTCSessionDescription({
-                type: signal.type,
+                type: signal.type as RTCSdpType,
                 sdp: atob(signal.sdp)
             }));
 
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
 
-            this.sendSignal(userId, 'answer', {
-                type: answer.type,
-                sdp: btoa(answer.sdp)
-            });
+            if (answer.sdp) {
+                this.sendSignal(userId, 'answer', {
+                    type: answer.type,
+                    sdp: btoa(answer.sdp)
+                });
+            }
 
             await this.processPendingCandidates(userId);
-        } catch {
+        } catch (error) {
+            console.error('Error handling offer:', error);
             this.closePeerConnection(userId);
         }
     }
 
-    async handleAnswer(userId, signal) {
+    private async handleAnswer(userId: number, signal: RTCSignal): Promise<void> {
         const pc = this.peerConnections.get(userId);
         if (!pc || pc.signalingState !== 'have-local-offer') return;
 
         try {
             await pc.setRemoteDescription(new RTCSessionDescription({
-                type: signal.type,
+                type: signal.type as RTCSdpType,
                 sdp: atob(signal.sdp)
             }));
             await this.processPendingCandidates(userId);
-        } catch {
+        } catch (error) {
+            console.error('Error handling answer:', error);
         }
     }
 
-    async handleIceCandidate(userId, signal) {
+    private async handleIceCandidate(userId: number, signal: ICECandidateSignal): Promise<void> {
         const pc = this.peerConnections.get(userId);
         if (!pc) return;
 
@@ -560,11 +653,12 @@ class VoiceChat {
                 sdpMLineIndex: signal.sdpMLineIndex,
                 sdpMid: signal.sdpMid
             }));
-        } catch {
+        } catch (error) {
+            console.error('Error adding ICE candidate:', error);
         }
     }
 
-    async processPendingCandidates(userId) {
+    private async processPendingCandidates(userId: number): Promise<void> {
         const pending = this.pendingCandidates.get(userId) || [];
         const pc = this.peerConnections.get(userId);
         if (!pc || pending.length === 0) return;
@@ -576,14 +670,19 @@ class VoiceChat {
                     sdpMLineIndex: signal.sdpMLineIndex,
                     sdpMid: signal.sdpMid
                 }));
-            } catch {
+            } catch (error) {
+                console.error('Error processing pending candidate:', error);
             }
         }
 
         this.pendingCandidates.set(userId, []);
     }
 
-    sendSignal(targetUserId, type, signal) {
+    private sendSignal(
+        targetUserId: number,
+        type: 'offer' | 'answer' | 'ice-candidate',
+        signal: RTCSignal | ICECandidateSignal
+    ): void {
         if (!this.currentChannelId) return;
 
         fetch('/voice/signal', {
@@ -601,7 +700,7 @@ class VoiceChat {
         }).catch(() => {});
     }
 
-    broadcastJoined(channelId) {
+    private broadcastJoined(channelId: number): Promise<Response> {
         return fetch('/voice/joined', {
             method: 'POST',
             headers: {
@@ -615,18 +714,23 @@ class VoiceChat {
         });
     }
 
-    broadcastLeft(channelId) {
+    private broadcastLeft(channelId: number): void {
         fetch('/voice/left', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': this.getCsrfToken()
             },
-            body: JSON.stringify({channel_id: channelId})
+            body: JSON.stringify({ channel_id: channelId })
         }).catch(() => {});
     }
 
-    broadcastMuteStatus(channelId, userId = null, isMuted = null, mutedByAdmin = false) {
+    private broadcastMuteStatus(
+        channelId: number,
+        userId: number | null = null,
+        isMuted: boolean | null = null,
+        mutedByAdmin: boolean = false
+    ): void {
         fetch('/voice/mute-status', {
             method: 'POST',
             headers: {
@@ -642,7 +746,7 @@ class VoiceChat {
         }).catch(() => {});
     }
 
-    closePeerConnection(userId) {
+    private closePeerConnection(userId: number): void {
         const pc = this.peerConnections.get(userId);
         if (pc) {
             pc.close();
@@ -657,14 +761,20 @@ class VoiceChat {
         if (audio) audio.remove();
     }
 
-    updateChannelActiveState(channelId, isActive) {
-        const channel = document.querySelector(`.voice-channel[data-channel-id="${channelId}"]`);
+    private updateChannelActiveState(channelId: number, isActive: boolean): void {
+        const channel = document.querySelector<HTMLDivElement>(`.voice-channel[data-channel-id="${channelId}"]`);
         if (channel) {
             channel.classList.toggle('active', isActive);
         }
     }
 
-    createUserElement(userId, userName, userAvatar, isMuted, mutedByAdmin) {
+    private createUserElement(
+        userId: number,
+        userName: string,
+        userAvatar: string,
+        isMuted: boolean,
+        mutedByAdmin: boolean
+    ): HTMLDivElement {
         const mutedStatus = isMuted || false;
         const mutedByAdminStatus = mutedByAdmin || false;
 
@@ -675,7 +785,7 @@ class VoiceChat {
 
         const userElement = document.createElement('div');
         userElement.className = 'voice-user';
-        userElement.dataset.userId = userId;
+        userElement.dataset.userId = userId.toString();
         userElement.innerHTML = `
             <div class="voice-user-avatar">
                 <img src="${userAvatar}" alt="${userName}">
@@ -687,18 +797,30 @@ class VoiceChat {
         `;
 
         if (is_admin && userId !== current_user_id) {
-            const statusElement = userElement.querySelector('.voice-user-status');
-            statusElement.style.cursor = 'pointer';
-            statusElement.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.toggleMute(parseInt(statusElement.dataset.userId));
-            });
+            const statusElement = userElement.querySelector<HTMLDivElement>('.voice-user-status');
+            if (statusElement) {
+                statusElement.style.cursor = 'pointer';
+                statusElement.addEventListener('click', (e: MouseEvent) => {
+                    e.stopPropagation();
+                    const userIdAttr = statusElement.dataset.userId;
+                    if (userIdAttr) {
+                        this.toggleMute(parseInt(userIdAttr));
+                    }
+                });
+            }
         }
 
         return userElement;
     }
 
-    addUserToChannel(channelId, userId, userName, userAvatar, isMuted, mutedByAdmin) {
+    private addUserToChannel(
+        channelId: number,
+        userId: number,
+        userName: string,
+        userAvatar: string,
+        isMuted: boolean,
+        mutedByAdmin: boolean
+    ): void {
         const container = this.getChannelContainer(channelId);
         if (!container) return;
 
@@ -717,7 +839,7 @@ class VoiceChat {
         container.style.display = 'block';
     }
 
-    removeUserFromChannel(channelId, userId) {
+    private removeUserFromChannel(channelId: number, userId: number): void {
         const userElement = this.userElements.get(userId);
         if (userElement) {
             userElement.remove();
@@ -733,11 +855,11 @@ class VoiceChat {
         this.userMutedByAdmin.delete(userId);
     }
 
-    updateUserMuteUI(channelId, userId, isMuted) {
+    private updateUserMuteUI(channelId: number, userId: number, isMuted: boolean): void {
         const userElement = this.userElements.get(userId);
         if (!userElement) return;
 
-        const statusElement = userElement.querySelector('.voice-user-status');
+        const statusElement = userElement.querySelector<HTMLDivElement>('.voice-user-status');
         if (!statusElement) return;
 
         const isMutedByAdmin = this.userMutedByAdmin.get(userId) || false;
@@ -753,6 +875,9 @@ class VoiceChat {
     }
 }
 
+// Initialize on DOM load
 document.addEventListener('DOMContentLoaded', () => {
     window.voiceChat = new VoiceChat();
 });
+
+export {};

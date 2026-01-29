@@ -8,7 +8,11 @@
     <title>{{ $title ?? "Open source messenger" }}</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
     @vite('resources/scss/index.scss')
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @vite(['resources/css/app.css', 'resources/js/app.js',
+        'resources/ts/index.ts',
+        'resources/ts/voice.ts',
+        'resources/ts/upload.ts',
+    ])
     <script src="https://cdn.tailwindcss.com"></script>
     @php
         use Illuminate\Support\Facades\Crypt;
@@ -303,8 +307,5 @@
     const is_admin = {{ Auth::user()->admin }};
     const current_user_avatar = "{{ asset(Auth::user()->avatar) }}";
 </script>
-<script src="{{ asset('js/voice.js') }}"></script>
-<script src="{{ asset('js/upload.js') }}"></script>
-<script src="{{ asset('js/index.js') }}"></script>
 </body>
 </html>
