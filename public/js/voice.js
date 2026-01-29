@@ -152,7 +152,7 @@ class VoiceChat {
         });
     }
 
-    async handleUserLeft(channelId, userId) {
+    handleUserLeft(channelId, userId) {
         this.removeUserFromChannel(channelId, userId);
 
         const users = this.channelUsers.get(channelId) || new Set();
@@ -174,7 +174,7 @@ class VoiceChat {
                         'X-CSRF-TOKEN': this.getCsrfToken()
                     },
                     body: JSON.stringify({channel_id: this.currentChannelId})
-                });
+                }).catch(() => {});
             }
         }, 120000);
     }
@@ -186,33 +186,32 @@ class VoiceChat {
         }
     }
 
-    async loadActiveUsers(channelId) {
-        try {
-            const response = await fetch(`/voice/active-users?channel_id=${channelId}`);
-            if (!response.ok) return;
+    loadActiveUsers(channelId) {
+        fetch(`/voice/active-users?channel_id=${channelId}`)
+            .then(response => response.ok ? response.json() : null)
+            .then(data => {
+                if (!data) return;
 
-            const data = await response.json();
-            const users = Object.values(data.users);
+                const users = Object.values(data.users);
+                if (users.length === 0) return;
 
-            if (users.length === 0) return;
+                const fragment = document.createDocumentFragment();
+                const container = this.getChannelContainer(channelId);
+                if (!container) return;
 
-            const fragment = document.createDocumentFragment();
-            const container = this.getChannelContainer(channelId);
-            if (!container) return;
+                users.forEach(user => {
+                    this.userMuteStatus.set(user.id, user.muted || false);
+                    this.userMutedByAdmin.set(user.id, user.muted_by_admin || false);
 
-            users.forEach(user => {
-                this.userMuteStatus.set(user.id, user.muted || false);
-                this.userMutedByAdmin.set(user.id, user.muted_by_admin || false);
+                    const userElement = this.createUserElement(user.id, user.name, user.avatar, user.muted, user.muted_by_admin);
+                    this.userElements.set(user.id, userElement);
+                    fragment.appendChild(userElement);
+                });
 
-                const userElement = this.createUserElement(user.id, user.name, user.avatar, user.muted, user.muted_by_admin);
-                this.userElements.set(user.id, userElement);
-                fragment.appendChild(userElement);
-            });
-
-            container.appendChild(fragment);
-            container.style.display = 'block';
-        } catch {
-        }
+                container.appendChild(fragment);
+                container.style.display = 'block';
+            })
+            .catch(() => {});
     }
 
     monitorAudioLevel(audioElement, userId) {
@@ -224,17 +223,22 @@ class VoiceChat {
         source.connect(analyser);
 
         const data = new Uint8Array(analyser.frequencyBinCount);
-        const userEl = this.userElements.get(userId);
 
         const check = () => {
+            if (!this.currentChannelId) return;
+
             analyser.getByteFrequencyData(data);
             const avg = data.reduce((a, b) => a + b) / data.length;
 
+            const userEl = this.userElements.get(userId);
             if (userEl) {
-                userEl.classList.toggle('current-user', avg > this.volumeThreshold);
+                const shouldHighlight = avg > this.volumeThreshold;
+                if (userEl.classList.contains('current-user') !== shouldHighlight) {
+                    userEl.classList.toggle('current-user', shouldHighlight);
+                }
             }
 
-            if (this.currentChannelId) requestAnimationFrame(check);
+            requestAnimationFrame(check);
         };
         check();
     }
@@ -275,6 +279,7 @@ class VoiceChat {
                     muted: this.isMuted,
                 })
             });
+
             if (!response.ok) return;
 
             const data = await response.json();
@@ -309,7 +314,7 @@ class VoiceChat {
         }
     }
 
-    async leaveChannel() {
+    leaveChannel() {
         if (!this.currentChannelId) return;
 
         const channelId = this.currentChannelId;
@@ -327,17 +332,13 @@ class VoiceChat {
         this.ignoreOffer.clear();
         this.pendingCandidates.clear();
 
-        const fragment = document.createDocumentFragment();
-        document.querySelectorAll('[id^="remote-audio-"]').forEach(audio => {
-            fragment.appendChild(audio);
-        });
-
-        this.broadcastLeft(channelId);
+        document.querySelectorAll('[id^="remote-audio-"]').forEach(audio => audio.remove());
 
         this.updateChannelActiveState(channelId, false);
         this.currentChannelId = null;
         this.mutedByAdmin = false;
         this.updateSelfMuteUI();
+        this.broadcastLeft(channelId);
     }
 
     toggleMute(userId = null) {
@@ -347,6 +348,7 @@ class VoiceChat {
 
             this.userMuteStatus.set(userId, newMuteStatusByAdmin);
             this.userMutedByAdmin.set(userId, newMuteStatusByAdmin);
+
             this.updateUserMuteUI(this.currentChannelId, userId, newMuteStatusByAdmin);
 
             this.broadcastMuteStatus(this.currentChannelId, userId, true, newMuteStatusByAdmin);
@@ -379,8 +381,7 @@ class VoiceChat {
             muteBtn.classList.add(this.mutedByAdmin ? 'muted-by-admin' : 'muted');
         }
 
-        muteBtn.style.opacity = isDisabled ? '0.5' : '1';
-        muteBtn.style.cursor = isDisabled ? 'not-allowed' : 'pointer';
+        muteBtn.style.cssText = `opacity: ${isDisabled ? '0.5' : '1'}; cursor: ${isDisabled ? 'not-allowed' : 'pointer'}`;
 
         muteBtn.innerHTML = this.isMuted
             ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>'
@@ -578,6 +579,7 @@ class VoiceChat {
             } catch {
             }
         }
+
         this.pendingCandidates.set(userId, []);
     }
 
@@ -596,7 +598,7 @@ class VoiceChat {
                 type: type,
                 signal: signal
             })
-        });
+        }).catch(() => {});
     }
 
     broadcastJoined(channelId) {
@@ -621,7 +623,7 @@ class VoiceChat {
                 'X-CSRF-TOKEN': this.getCsrfToken()
             },
             body: JSON.stringify({channel_id: channelId})
-        });
+        }).catch(() => {});
     }
 
     broadcastMuteStatus(channelId, userId = null, isMuted = null, mutedByAdmin = false) {
@@ -637,7 +639,7 @@ class VoiceChat {
                 user_id: userId,
                 muted_by_admin: mutedByAdmin,
             })
-        });
+        }).catch(() => {});
     }
 
     closePeerConnection(userId) {
