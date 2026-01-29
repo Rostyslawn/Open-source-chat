@@ -1,7 +1,9 @@
+import {UserInterface} from "./modules/interfaces";
+
 interface EchoChannel {
     here(callback: (users: any[]) => void): EchoChannel;
-    joining(callback: (user: any) => void): EchoChannel;
-    leaving(callback: (user: any) => void): EchoChannel;
+    joining(callback: (user: UserInterface) => void): EchoChannel;
+    leaving(callback: (user: UserInterface) => void): EchoChannel;
     listen(event: string, callback: (data: any) => void): EchoChannel;
 }
 
