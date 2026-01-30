@@ -44,19 +44,17 @@ class IndexController extends Controller
 
         $validationRules = [];
 
-        if ($hasFile) {
-            $validationRules['file'] = 'required|file|max:512000';
-        }
-
         if ($hasMessage) {
             $validationRules['message'] = 'required|string|max:2000';
+        } else if ($hasFile) {
+            $validationRules['file'] = 'required|file|max:512000';
         }
 
         $request->validate($validationRules);
 
         $sender = Auth::user();
 
-        $messageText = $hasMessage ? strip_tags($request->input('message')) : '';
+        $messageText = $hasMessage ? strip_tags($request->input('message')) : null;
 
         $messageData = [
             'sender_id' => $sender->id,
@@ -64,9 +62,7 @@ class IndexController extends Controller
 
         if ($hasMessage) {
             $messageData['message'] = Crypt::encryptString($messageText);
-        }
-
-        if ($hasFile) {
+        } else if ($hasFile) {
             try {
                 $file = $request->file('file');
 

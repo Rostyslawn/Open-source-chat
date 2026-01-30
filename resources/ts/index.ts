@@ -1,4 +1,4 @@
-import { MessageInterface, MessageToDeleteInterface, UserInterface } from "./modules/interfaces";
+import {MessageInterface, MessageToDeleteInterface, UserInterface} from "./modules/interfaces";
 
 // DOM Elements
 const users_online = document.querySelector<HTMLDivElement>('.online-users');
@@ -43,48 +43,19 @@ const closeModal = (): void => {
 };
 
 // Message Functions
-const sendMessage = async (messageText: string, file: File | null): Promise<void> => {
-    if (!messageText && !file) return;
-
-    const headers: HeadersInit = {
-        'X-CSRF-TOKEN': getCsrfToken()
-    };
-    let body: FormData | string;
-
-    if (file) {
-        const maxSize = 500 * 1024 * 1024; // 500MB
-
-        if (file.size > maxSize) {
-            alert('File too large! Maximum size is 500MB');
-            closeModal();
-            hideUploadNotification();
-            return;
-        }
-
-        showUploadNotification();
-        const formData = new FormData();
-        formData.append('_token', getCsrfToken());
-
-        if (messageText && messageText.trim() !== '') {
-            formData.append('message', messageText);
-        }
-
-        formData.append('file', file);
-        body = formData;
-
-        headers['X-Requested-With'] = 'XMLHttpRequest';
-    } else {
-        headers['Content-Type'] = 'application/json';
-        body = JSON.stringify({
-            message: messageText
-        });
-    }
+const sendMessage = async (messageText: string): Promise<void> => {
+    if (!messageText) return;
 
     try {
         const res = await fetch('/sendMessage', {
             method: 'POST',
-            headers: headers,
-            body: body,
+            headers: {
+                'X-CSRF-TOKEN': getCsrfToken(),
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                message: messageText,
+            }),
         });
 
         if (!res.ok) {
@@ -95,30 +66,15 @@ const sendMessage = async (messageText: string, file: File | null): Promise<void
         const data = await res.json();
 
         if (data.status) {
-            if (file) {
-                window.selectedFile = null;
-                if (fileInput) fileInput.value = '';
-                closeModal();
-                hideUploadNotification();
-            }
             if (textarea) {
                 textarea.value = '';
                 textarea.style.height = 'auto';
             }
         } else {
             console.error('Server error:', data.error);
-            if (file) {
-                hideUploadNotification();
-                alert('Error: ' + (data.error || 'Failed to send file'));
-            }
         }
     } catch (err) {
         console.error('Error:', err);
-        if (file) {
-            hideUploadNotification();
-            const errorMessage = err instanceof Error ? err.message : 'Failed to send file. Check file size and try again.';
-            alert('Error: ' + errorMessage);
-        }
     }
 };
 
@@ -148,7 +104,7 @@ const deleteMessage = async (message_id: number): Promise<void> => {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': getCsrfToken()
             },
-            body: JSON.stringify({ "message_id": message_id })
+            body: JSON.stringify({"message_id": message_id})
         });
 
         if (!res.ok) throw new Error("Response wasn't ok.");
@@ -430,7 +386,7 @@ if (textarea) {
             e.preventDefault();
             const messageText = textarea.value.trim();
             if (messageText) {
-                sendMessage(messageText, null);
+                sendMessage(messageText);
             }
         }
     });
@@ -440,7 +396,7 @@ if (textarea) {
 send_button?.addEventListener('click', () => {
     const messageText = textarea?.value.trim();
     if (messageText) {
-        sendMessage(messageText, null);
+        sendMessage(messageText);
     }
 });
 
