@@ -21,7 +21,6 @@ class ActivationkeyFactory extends Factory
         return [
 //            'key' => Hash::make(fake()->uuid()),
             'key' => Hash::make(123456),
-            'aviable' => true,
         ];
     }
 }

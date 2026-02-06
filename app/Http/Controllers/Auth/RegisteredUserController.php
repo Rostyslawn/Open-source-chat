@@ -39,28 +39,26 @@ class RegisteredUserController extends Controller
         $keys = Activationkey::all();
 
         foreach ($keys as $key) {
-            if ($key->aviable) {
-                if (Hash::check($request->activation_key, $key->key)) {
-                    $user = User::create([
-                        'name' => $request->name,
-                        'password' => Hash::make($request->password),
-                        'verified' => true,
-                    ]);
+            if (Hash::check($request->activation_key, $key->key)) {
+                $user = User::create([
+                    'name' => $request->name,
+                    'password' => Hash::make($request->password),
+                    'verified' => true,
+                ]);
 
-                    if ($request->hasFile('avatar')) {
-                        $path = $request->file('avatar')->store('avatars', 'public');
-                        $user->avatar = "/storage/" . $path;
-                        $user->save();
-                    }
-
-                    $key->delete();
-
-                    event(new Registered($user));
-
-                    Auth::login($user);
-
-                    return redirect(route('index', absolute: false));
+                if ($request->hasFile('avatar')) {
+                    $path = $request->file('avatar')->store('avatars', 'public');
+                    $user->avatar = "/storage/" . $path;
+                    $user->save();
                 }
+
+                $key->delete();
+
+                event(new Registered($user));
+
+                Auth::login($user);
+
+                return redirect(route('index', absolute: false));
             }
         }
 

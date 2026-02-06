@@ -14,7 +14,6 @@ return new class extends Migration
         Schema::create('activationkeys', function (Blueprint $table) {
             $table->id();
             $table->string('key')->unique();
-            $table->boolean('aviable')->default(true);
             $table->timestamps();
         });
     }
