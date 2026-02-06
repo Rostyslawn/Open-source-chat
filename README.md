@@ -94,7 +94,7 @@ The application will be available at:
 ### 6. Access the Application
 
 **Default Admin Account:**
-- **Email:** admin@admin
+- **Name:** Admin
 - **Password:** Strongpassword228
 
 ⚠️ **Important:** Change the admin password after first login for security reasons!
@@ -448,7 +448,7 @@ npm run start
 ### 6. Доступ к приложению
 
 **Аккаунт администратора по умолчанию:**
-- **Email:** admin@admin
+- **Name:** Admin
 - **Пароль:** Strongpassword228
 
 ⚠️ **Важно:** Измените пароль администратора после первого входа в целях безопасности!

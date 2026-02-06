@@ -32,7 +32,6 @@ class RegisteredUserController extends Controller
     {
         $request->validate([
             'name' => ['required', 'string', 'max:16'],
-            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:' . User::class],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'activation_key' => ['required'],
         ]);
@@ -44,9 +43,7 @@ class RegisteredUserController extends Controller
                 if (Hash::check($request->activation_key, $key->key)) {
                     $user = User::create([
                         'name' => $request->name,
-                        'email' => $request->email,
                         'password' => Hash::make($request->password),
-                        'email_verified_at' => now(),
                         'verified' => true,
                     ]);
 
