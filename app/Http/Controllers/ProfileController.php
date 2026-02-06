@@ -37,6 +37,8 @@ class ProfileController extends Controller
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
+        if (Auth::user()->admin) return redirect()->back();
+
         $request->validate([
             'name' => ['required', 'max:16'],
         ]);
