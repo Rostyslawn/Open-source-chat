@@ -55,6 +55,13 @@
                     </div>
 
                     @if($userItem->id != Auth::id())
+                        <button
+                            onclick="confirmAction({{ $userItem->id }}, '{{ $userItem->name }}', 'resetpassword')"
+                            type="button"
+                            class="ml-4 inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-500 active:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150"
+                        >
+                            Reset password
+                        </button>
                         @if($userItem->banned)
                             <button
                                 onclick="confirmAction({{ $userItem->id }}, '{{ $userItem->name }}', 'unban')"
@@ -82,11 +89,56 @@
         @endif
     </div>
 
-    {{-- Ban Modal --}}
+    {{-- Action Modal --}}
     <div id="actionModal"
          class="hidden fixed inset-0 bg-gray-500 dark:bg-gray-900 bg-opacity-75 dark:bg-opacity-75 overflow-y-auto h-full w-full z-50 px-4">
         <div
             class="relative top-20 mx-auto p-5 border border-gray-200 dark:border-gray-700 w-full max-w-md shadow-lg rounded-lg bg-white dark:bg-gray-800">
+
+            {{-- Reset Password Form --}}
+            <form id="resetPasswordForm" method="POST" action="{{ route('profile.resetpassword') }}" style="display: none;">
+                @csrf
+                @method('POST')
+                <input type="hidden" name="user_id" id="resetPasswordUserId">
+
+                <div class="mt-3">
+                    <div
+                        class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900">
+                        <svg class="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor"
+                             viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mt-4 text-center">
+                        Reset Password for User?
+                    </h3>
+                    <div class="mt-2 px-7 py-3">
+                        <p class="text-sm text-gray-600 dark:text-gray-400 text-center">
+                            You are about to reset password for <span id="resetPasswordUsername"
+                                                                      class="font-semibold text-gray-900 dark:text-gray-100"></span>.
+                        </p>
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mt-2 text-center">
+                            A new password will be generated and sent to the user.
+                        </p>
+                    </div>
+                    <div class="flex gap-3 px-4 py-3 mt-4">
+                        <button
+                            type="button"
+                            onclick="closeActionModal()"
+                            class="flex-1 inline-flex justify-center items-center px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-widest shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-25 transition ease-in-out duration-150"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            class="flex-1 inline-flex justify-center items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-500 active:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150"
+                        >
+                            Reset Password
+                        </button>
+                    </div>
+                </div>
+            </form>
 
             {{-- Ban Form --}}
             <form id="banForm" method="POST" action="{{ route('profile.destroy') }}" style="display: none;">
@@ -194,6 +246,15 @@
         </div>
     @endif
 
+    @if(session('status.type') == 'password-reset')
+        <div
+            class="mt-4 p-4 bg-blue-50 dark:bg-blue-900/50 border border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200 rounded-lg">
+            <p class="font-semibold">Password successfully reset!</p>
+            <p class="mt-2">New password: <span class="dark:bg-red-600 font-mono font-bold">{{ session('status.key') }}</span></p>
+            <p class="mt-2 text-sm">Please save this password and share it with the user.</p>
+        </div>
+    @endif
+
     {{-- Error Messages --}}
     @if(session('error'))
         <div
@@ -215,16 +276,23 @@
     });
 
     const confirmAction = (userId, username, action) => {
-        if (action == 'ban') {
+        // Hide all forms first
+        document.getElementById('banForm').style.display = 'none';
+        document.getElementById('unbanForm').style.display = 'none';
+        document.getElementById('resetPasswordForm').style.display = 'none';
+
+        if (action === 'ban') {
             document.getElementById('banUsername').textContent = username;
             document.getElementById('banUserId').value = userId;
             document.getElementById('banForm').style.display = 'block';
-            document.getElementById('unbanForm').style.display = 'none';
-        } else if (action == 'unban') {
+        } else if (action === 'unban') {
             document.getElementById('unbanUsername').textContent = username;
             document.getElementById('unbanUserId').value = userId;
-            document.getElementById('banForm').style.display = 'none';
             document.getElementById('unbanForm').style.display = 'block';
+        } else if (action === 'resetpassword') {
+            document.getElementById('resetPasswordUsername').textContent = username;
+            document.getElementById('resetPasswordUserId').value = userId;
+            document.getElementById('resetPasswordForm').style.display = 'block';
         }
 
         document.getElementById('actionModal').classList.remove('hidden');
@@ -235,13 +303,13 @@
     };
 
     document.getElementById('actionModal').addEventListener('click', (e) => {
-        if (e.target == e.currentTarget) {
+        if (e.target === e.currentTarget) {
             closeActionModal();
         }
     });
 
     document.addEventListener('keydown', (e) => {
-        if (e.key == 'Escape') {
+        if (e.key === 'Escape') {
             closeActionModal();
         }
     });

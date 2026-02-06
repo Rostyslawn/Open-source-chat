@@ -7,6 +7,7 @@ use App\Http\Controllers\Auth\RegisteredUserController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Middleware\BanCheck;
 use App\Http\Middleware\VerificationKey;
+use App\Http\Controllers\Auth\ResetPasswordController;
 
 Route::middleware('guest')->group(function () {
     Route::get('register', [RegisteredUserController::class, 'create'])
@@ -21,6 +22,8 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware(['auth', BanCheck::class, VerificationKey::class])->group(function () {
+    Route::post('resetpassword', [ResetPasswordController::class, 'resetPassword'])->name('profile.resetpassword');
+
     Route::get('confirm-password', [ConfirmablePasswordController::class, 'show'])
         ->name('password.confirm');
 
