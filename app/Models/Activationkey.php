@@ -11,6 +11,5 @@ class Activationkey extends Model
 
     protected $fillable = [
         'key',
-        'aviable',
     ];
 }
