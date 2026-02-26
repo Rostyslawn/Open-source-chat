@@ -45,7 +45,7 @@ const closeModal = (): void => {
 // Message Functions
 const sendMessage = async (messageText: string): Promise<void> => {
     if (!messageText) return;
-
+    
     try {
         const res = await fetch('/sendMessage', {
             method: 'POST',
@@ -167,7 +167,7 @@ const createMessageElement = (message: MessageInterface): HTMLDivElement => {
 
     const delete_message_div = document.createElement("div");
 
-    if (window.current_user_name === message.sender) {
+    if (current_user_name == message.sender || is_admin) {
         message_div.classList.add("current-user");
         sender_span.textContent = "You";
         delete_message_div.classList.add("delete-message");
@@ -305,7 +305,7 @@ document.addEventListener('DOMContentLoaded', (): void => {
 
     if (deleteModal) {
         deleteModal.addEventListener('click', (e: MouseEvent) => {
-            if (e.target === deleteModal) {
+            if (e.target == deleteModal) {
                 hideDeleteConfirmation();
             }
         });
@@ -382,7 +382,7 @@ if (textarea) {
     });
 
     textarea.addEventListener('keydown', (e: KeyboardEvent) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
+        if (e.key == 'Enter' && !e.shiftKey) {
             e.preventDefault();
             const messageText = textarea.value.trim();
             if (messageText) {

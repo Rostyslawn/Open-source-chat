@@ -13,11 +13,6 @@ declare global {
             join(channel: string): EchoChannel;
         };
         voiceChat?: VoiceChat;
-        voices_count: number[];
-        current_user_id: number;
-        current_user_name: string;
-        current_user_avatar: string;
-        is_admin: boolean;
         selectedFile: File | null;
     }
 

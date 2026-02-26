@@ -54,7 +54,7 @@ class IndexController extends Controller
 
         $sender = Auth::user();
 
-        $messageText = $hasMessage ? strip_tags($request->input('message')) : null;
+        $messageText = $hasMessage ? $request->input('message') : null;
 
         $messageData = [
             'sender_id' => $sender->id,
@@ -151,7 +151,7 @@ class IndexController extends Controller
             return response()->json(['status' => false, 'error' => 'Message not found.'], 404);
         }
 
-        if ($message_data->sender_id !== Auth::id()) {
+        if ($message_data->sender_id != Auth::id() && !Auth::user()->admin) {
             Log::warning('Unauthorized delete attempt', [
                 'user_id' => Auth::id(),
                 'message_id' => $message_id,
@@ -169,7 +169,7 @@ class IndexController extends Controller
                 try {
                     $relativePath = str_replace('/storage/', '', $message_data->file_path);
 
-                    if (strpos($relativePath, '..') !== false) {
+                    if (strpos($relativePath, '..') != false) {
                         Log::error('Path traversal attempt in file deletion', [
                             'path' => $relativePath,
                             'user_id' => Auth::id(),
