@@ -245,6 +245,11 @@
                                     </div>
                                 @endif
                             </div>
+                            @if(Auth::user()->admin)
+                                <div onclick="deleteMessage({{ $message->id }})" class="delete-message">
+                                    delete
+                                </div>
+                            @endif
                         </div>
                     </div>
                 @endif
@@ -301,7 +306,7 @@
     </div>
 </div>
 <script>
-    const voices_count = [1,2,3];
+    const voices_count = [1, 2, 3];
     const current_user_name = "{{ Auth::user()->name }}";
     const current_user_id = {{ Auth::user()->id }};
     const is_admin = {{ Auth::user()->admin }};
