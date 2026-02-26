@@ -54,7 +54,7 @@ class IndexController extends Controller
 
         $sender = Auth::user();
 
-        $messageText = $hasMessage ? strip_tags($request->input('message')) : null;
+        $messageText = $hasMessage ? $request->input('message') : null;
 
         $messageData = [
             'sender_id' => $sender->id,
