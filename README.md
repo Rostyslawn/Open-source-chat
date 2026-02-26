@@ -1,4 +1,4 @@
-# 💬 Open source chat (Beta version 1.8.3)
+# 💬 Open source chat (Beta version 1.8.4)
 
 Open source chat is a real-time open-source messenger with a single global chat room where all users communicate together. No private messages, no separate channels - just one shared space for everyone to connect and chat in real-time.
 
