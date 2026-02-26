@@ -63,6 +63,8 @@ class RegisteredUserController extends Controller
             }
         }
 
-        abort(403);
+        return back()->withErrors([
+            'activation_key' => 'Invalid activation key.',
+        ])->withInput();
     }
 }

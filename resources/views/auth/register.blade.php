@@ -50,6 +50,8 @@
                           type="password"
                           name="activation_key"
                           required autocomplete="activation_key" />
+
+            <x-input-error :messages="$errors->get('activation_key')" class="mt-2" />
         </div>
 
         <div class="flex items-center justify-end mt-4">
